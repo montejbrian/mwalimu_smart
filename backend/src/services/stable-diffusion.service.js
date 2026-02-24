@@ -53,7 +53,11 @@ export async function generateEducationalImage(
             cached: false
         };
     } catch (error) {
-        console.error('Error generating image with Stable Diffusion:', error);
+        if (error.response) {
+            console.warn(`Stable Diffusion API unavailable (${error.response.status}): ${error.response.statusText}. Falling back to canvas visuals.`);
+        } else {
+            console.error('Error generating image with Stable Diffusion:', error.message);
+        }
         throw new Error('Failed to generate image');
     }
 }

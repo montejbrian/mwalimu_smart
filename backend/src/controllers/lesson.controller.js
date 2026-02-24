@@ -57,8 +57,30 @@ export async function generateVisualController(req, res) {
             return res.status(400).json({ error: 'stepNumber is required and must be a number' });
         }
 
-        const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script);
-        return res.json({ instructions });
+        // Determine if we should use Manim or Canvas
+        const manimTopics = ['math', 'physics', 'geometry', 'theorem', 'equation', 'pythagorean'];
+        const isManim = manimTopics.some(t => topic.toLowerCase().includes(t));
+
+        if (isManim) {
+            try {
+                // Import the manim service dynamically to avoid issues if the python server is down
+                const { generateManimAnimation } = await import('../services/manim.service.js');
+                const manimResult = await generateManimAnimation(stepText, stepNumber, topic, script);
+                return res.json({
+                    isVideo: true,
+                    videoBase64: manimResult.videoBase64
+                });
+            } catch (manimError) {
+                console.warn('Manim generation failed, falling back to canvas instructions:', manimError.message);
+                // Fallback to canvas
+                const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script);
+                return res.json({ instructions });
+            }
+        } else {
+            const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script);
+            return res.json({ instructions });
+        }
+
 
     } catch (error) {
         console.error('Error generating visual instructions:', error);
@@ -95,7 +117,7 @@ export async function generateImageController(req, res) {
             cached: result.cached
         });
     } catch (error) {
-        console.error('Error generating AI image:', error);
+        console.log(`AI Image Fallback triggered: ${error.message}`);
         // Fallback to canvas on error
         return res.json({ useAI: false, error: 'Failed to generate image' });
     }
