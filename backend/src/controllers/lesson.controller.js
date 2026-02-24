@@ -14,7 +14,8 @@ export async function generateLessonController(req, res) {
 
         const lessonData = await generateLesson(question, image);
 
-        console.log('Generated lesson:', lessonData.title);
+        console.log(`Generated lesson: "${lessonData.title}" with ${lessonData.steps.length} steps and scripts.`);
+
         return res.json(lessonData);
     } catch (error) {
         console.error('Error generating lesson:', error);
@@ -46,7 +47,7 @@ export async function generateAudioController(req, res) {
 /*Generate visual instructions for a step*/
 export async function generateVisualController(req, res) {
     try {
-        const { stepText, stepNumber } = req.body;
+        const { stepText, stepNumber, topic, script } = req.body;
 
         if (!stepText || typeof stepText !== 'string') {
             return res.status(400).json({ error: 'stepText is required and must be a string' });
@@ -56,8 +57,9 @@ export async function generateVisualController(req, res) {
             return res.status(400).json({ error: 'stepNumber is required and must be a number' });
         }
 
-        const instructions = await generateVisualInstructions(stepText, stepNumber);
+        const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script);
         return res.json({ instructions });
+
     } catch (error) {
         console.error('Error generating visual instructions:', error);
         return res.status(500).json({

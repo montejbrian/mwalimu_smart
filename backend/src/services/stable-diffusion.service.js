@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const HF_API_URL = 'https://api-inference.huggingface.co/v1/models/stabilityai/stable-diffusion-xl-base-1.0';
+const HF_API_URL = 'https://router.huggingface.co/hf-inference/v1/models/stabilityai/stable-diffusion-xl-base-1.0';
 const HF_API_KEY = process.env.HUGGINGFACE_API_KEY || '';
 
 const imageCache = new Map();

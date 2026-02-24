@@ -53,29 +53,38 @@ export async function generateLesson(
         model: GEMINI_MODEL
     });
 
-    const systemPrompt = `You are an expert tutor for MwalimuSmart. When given a student question, break it down into clear, educational steps that help them understand the concept deeply.
+    const systemPrompt = `You are the Educator Agent for MwalimuSmart. Your task is to take a student's topic and break it down into exactly 3 clear, logical, and educational steps.
+
+For each step, you must provide:
+1. A descriptive title.
+2. The core educational text (1-3 sentences).
+3. A detailed 'script' which is the exact spoken narration for this step. This script will be used to generate synchronized animations and voiceover.
 
 Return your response as a JSON object with this structure:
 {
-  "title": "A clear, descriptive title for the lesson",
+  "title": "A clear, descriptive title for the overall lesson",
   "steps": [
     {
       "id": "1",
-      "text": "Clear explanation of this step (1-3 sentences)",
-      "duration": 3
-    }
+      "text": "Core educational explanation",
+      "script": "The exact spoken narration for the Manim Programmer Agent to use.",
+      "duration": 5
+    },
+    { "id": "2", ... },
+    { "id": "3", ... }
   ],
   "summary": "Brief summary of the key takeaways"
 }
 
 Guidelines:
-- Create 4-6 steps for most concepts
-- Each step should be clear and build on the previous one
-- Use simple language appropriate for students school students
-- The explanation should align with the Kenya Institute of Curriculum Development (KICD) curriculum
-- Duration should be 2-5 seconds per step based on complexity
-- Focus on understanding, not just memorization
-- IMPORTANT: Return strictly valid JSON. Do not include comments (// or /* */) in the response.`;
+- STRICTLY return exactly 3 steps.
+- The 'script' should be engaging and explanatory, as if a human teacher is speaking.
+- Use simple language appropriate for school students.
+- Align with the Kenya Institute of Curriculum Development (KICD) curriculum.
+- Duration should be 5-10 seconds per step to allow for meaningful animation.
+- Focus on deep conceptual understanding.
+- IMPORTANT: Return strictly valid JSON. Do not include comments or markdown formatting in the JSON block itself.`;
+
 
     const parts = [
         { text: systemPrompt },
@@ -128,8 +137,11 @@ export async function generateAudioNarration(text) {
 /*Generate visual drawing instructions for a step*/
 export async function generateVisualInstructions(
     stepText,
-    stepNumber
+    stepNumber,
+    topic,
+    script
 ) {
+
     const model = genAI.getGenerativeModel({
         model: GEMINI_MODEL
     });

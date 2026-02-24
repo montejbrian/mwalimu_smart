@@ -25,12 +25,14 @@ def generate_animation_endpoint():
         step_text = data.get('stepText')
         step_number = data.get('stepNumber', 1)
         topic = data.get('topic', 'general')
+        script = data.get('script') # Educator's script
         
         if not step_text:
             return jsonify({'error': 'stepText is required'}), 400
         
-        # Generate animation
-        video_path = generate_animation(step_text, step_number, topic)
+        # Generate animation (now takes script)
+        video_path = generate_animation(step_text, step_number, topic, script)
+
         
         if not video_path or not os.path.exists(video_path):
             return jsonify({'error': 'Failed to generate animation'}), 500
