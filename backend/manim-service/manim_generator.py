@@ -7,43 +7,60 @@ import tempfile
 
 load_dotenv()
 
-# Configure Gemini AI
+# Gemini AI
 genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
 
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), 'videos')
 os.makedirs(VIDEO_DIR, exist_ok=True)
 
 def generate_manim_code(step_text: str, topic: str) -> str:
-    """Use Gemini AI to generate Manim Python code"""
+
     model = genai.GenerativeModel('gemini-2.0-flash-exp')
     
-    prompt = f"""You are a Manim animation expert. Generate Python code using the Manim library to create a short, educational animation for this concept:
+    prompt = f"""You are a Manim animation expert. Generate Python code using the Manim library and manim-voiceover to create a short, educational animation with synchronized voiceover for this concept:
 
 Topic: {topic}
 Step: {step_text}
 
 Requirements:
 1. Use Manim Community Edition (manim library)
-2. Create a Scene class called GeneratedScene
-3. Keep animation under 10 seconds
-4. Use clear, simple visuals
-5. Include text labels
-6. Use smooth animations
-7. Return ONLY the Python code, no explanations
+2. Use manim-voiceover for audio
+3. Import: from manim_voiceover import VoiceoverScene
+4. Import: from manim_voiceover.services.gtts import GTTSService
+5. Create a Scene class called GeneratedScene that inherits from VoiceoverScene
+6. In construct(), set the speech service: self.set_speech_service(GTTSService())
+7. Use 'with self.voiceover(text=...) as tracker:' blocks for ALL speech sections.
+8. Synchronize animations inside the voiceover blocks.
+9. **Visibility Rules**:
+   - Use Green (#4CAF50) for all text and labels by default.
+   - If an object is also colored green, use White (#FFFFFF) for its label text to maintain visibility.
+10. Keep animation under 15 seconds.
+11. Return ONLY the Python code, no explanations.
 
 Example structure:
 ```python
 from manim import *
+from manim_voiceover import VoiceoverScene
+from manim_voiceover.services.gtts import GTTSService
 
-class GeneratedScene(Scene):
+class GeneratedScene(VoiceoverScene):
     def construct(self):
-        # Your animation code here
-        title = Text("{step_text[:30]}...")
-        self.play(Write(title))
+        self.set_speech_service(GTTSService())
+        
+        # Use Green for text
+        text = Text("Example", color="#4CAF50")
+        
+        # If object is green, use white text
+        obj = Circle(color="#4CAF50")
+        label = Text("Circle", color="#FFFFFF").next_to(obj, UP)
+        
+        with self.voiceover(text="This is a test.") as tracker:
+            self.play(Write(text))
+            
         self.wait(1)
 ```
 
-Generate the complete Manim code now:"""
+Generate the complete Manim code with voiceover now:"""
     
     response = model.generate_content(prompt)
     code = response.text

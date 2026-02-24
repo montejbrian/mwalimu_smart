@@ -5,6 +5,8 @@ import { generateAudio } from './tts.service.js';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const GEMINI_MODEL = 'gemini-2.5-flash';
+
 
 /*Helper to retry an operation with exponential backoff*/
 async function retryOperation(
@@ -48,7 +50,7 @@ export async function generateLesson(
     imageBase64
 ) {
     const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash'
+        model: GEMINI_MODEL
     });
 
     const systemPrompt = `You are an expert tutor for MwalimuSmart. When given a student question, break it down into clear, educational steps that help them understand the concept deeply.
@@ -69,7 +71,8 @@ Return your response as a JSON object with this structure:
 Guidelines:
 - Create 4-6 steps for most concepts
 - Each step should be clear and build on the previous one
-- Use simple language appropriate for secondary school students
+- Use simple language appropriate for students school students
+- The explanation should align with the Kenya Institute of Curriculum Development (KICD) curriculum
 - Duration should be 2-5 seconds per step based on complexity
 - Focus on understanding, not just memorization
 - IMPORTANT: Return strictly valid JSON. Do not include comments (// or /* */) in the response.`;
@@ -128,7 +131,7 @@ export async function generateVisualInstructions(
     stepNumber
 ) {
     const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash'
+        model: GEMINI_MODEL
     });
 
     const prompt = `You are a visual instruction generator for an educational whiteboard. Given a lesson step, generate simple drawing instructions that can be rendered on an HTML canvas.
