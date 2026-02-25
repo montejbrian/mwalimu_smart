@@ -33,12 +33,23 @@ async function retryOperation(
 }
 
 /*Helper to clean JSON string from markdown code blocks and comments*/
-function cleanJsonString(text) {
+export function cleanJsonString(text) {
+    let extracted = text;
+    // Try to extract content between ```json and ```
+    const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonBlockMatch && jsonBlockMatch[1]) {
+        extracted = jsonBlockMatch[1];
+    } else {
+        // Fallback: try to find the first { and last }
+        const firstBrace = text.indexOf('{');
+        const lastBrace = text.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            extracted = text.substring(firstBrace, lastBrace + 1);
+        }
+    }
 
-    let cleaned = text.replace(/```json\n?|\n?```/g, '');
-
+    let cleaned = extracted.replace(/```(?:json)?\n?|\n?```/g, ''); // Just in case
     cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
-
     cleaned = cleaned.replace(/(^|[^:])\/\/.*$/gm, '$1');
 
     return cleaned.trim();
