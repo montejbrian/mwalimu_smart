@@ -53,7 +53,7 @@ export async function generateLesson(
         model: GEMINI_MODEL
     });
 
-    const systemPrompt = `You are the Educator Agent for MwalimuSmart. Your task is to take a student's topic and break it down into exactly 3 clear, logical, and educational steps.
+    const systemPrompt = `You are the Educator Agent for MwalimuSmart. Your task is to take a student's topic and break it down into a comprehensive, highly educational lesson consisting of 4 to 7 clear and logical steps. Adjust the number of steps based on the complexity of the topic.
 
 For each step, you must provide:
 1. A descriptive title.
@@ -70,15 +70,15 @@ Return your response as a JSON object with this structure:
       "script": "The exact spoken narration for the Manim Programmer Agent to use.",
       "duration": 5
     },
-    { "id": "2", ... },
-    { "id": "3", ... }
+    { "id": "2", ... }
+    // Add up to 7 steps as needed to fully cover the topic
   ],
   "summary": "Brief summary of the key takeaways"
 }
 
 Guidelines:
-- STRICTLY return exactly 3 steps.
-- The 'script' should be engaging and explanatory, as if a human teacher is speaking.
+- Generate between 4 and 7 steps depending on what's necessary to fully explain the topic. Do not just stop at 3 if the topic is complex.
+- The 'script' should be engaging and explanatory, as if a human teacher is speaking. Break down complex ideas slowly.
 - Use simple language appropriate for school students.
 - Align with the Kenya Institute of Curriculum Development (KICD) curriculum.
 - Duration should be 5-10 seconds per step to allow for meaningful animation.

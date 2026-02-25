@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import lessonRoutes from './routes/lesson.routes.js';
+import qaRoutes from './routes/qa.routes.js';
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
 
 // Routes
 app.use('/api', lessonRoutes);
+app.use('/api/qa', qaRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
