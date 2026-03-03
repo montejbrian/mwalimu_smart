@@ -1,10 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import lessonRoutes from './routes/lesson.routes.js';
 import qaRoutes from './routes/qa.routes.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;

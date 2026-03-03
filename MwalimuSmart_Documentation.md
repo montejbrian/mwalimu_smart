@@ -64,7 +64,7 @@ The frontend is built for responsiveness and aesthetic appeal, handling all real
 
 ## Key Technical Decisions & Optimizations
 
-1. **Model Downgrade for Stability:** The system uses `gemini-1.5-flash` instead of `2.5-flash` to comfortably stay within free-tier API rate limits (1500 requests/day vs 20 requests/day), ensuring uninterrupted development and testing.
+1. **Model Usage:** The system is optimized for `gemini-2.5-flash` to leverage the latest features and improved reasoning capabilities for educational content generation.
 2. **Robust JSON Parsing:** The AI sometimes hallucinates conversational text outside of its required JSON block (e.g., "Sure, here is your diagram: ```json...```"). The backend uses an advanced Regex extractor (`cleanJsonString`) to isolate and parse only the valid JSON payload, preventing frontend crashes.
 3. **Audio Caching:** Text-to-speech files are hashed and saved locally in `backend/cache/audio/`. If a student requests a lesson on "Photosynthesis" twice, the backend serves the cached audio instantly instead of regenerating it, saving time and API quotas.
 

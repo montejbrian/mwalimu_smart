@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import subprocess
 import tempfile
 
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 # Gemini AI
 genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
@@ -16,7 +16,7 @@ os.makedirs(VIDEO_DIR, exist_ok=True)
 def generate_manim_code(step_text: str, topic: str, script: str = None, error_log: str = None, previous_code: str = None) -> str:
     """Manim Programmer Agent: Generates Manim code, potentially correcting previous errors."""
     
-    model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
+    model_name = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
     model = genai.GenerativeModel(model_name) # Using configurable model
     
     if error_log and previous_code:

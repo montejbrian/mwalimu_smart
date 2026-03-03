@@ -1,11 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import dotenv from 'dotenv';
 import { generateAudio } from './tts.service.js';
 
-dotenv.config();
-
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 
 /*Helper to retry an operation with exponential backoff*/
@@ -58,13 +55,24 @@ export function cleanJsonString(text) {
 /*Generate a structured lesson from a question and optional image*/
 export async function generateLesson(
     question,
-    imageBase64
+    imageBase64,
+    level = "senior-school"
 ) {
     const model = genAI.getGenerativeModel({
         model: GEMINI_MODEL
     });
 
+    const levelGuidelines = {
+        "lower-primary": "Lower Primary (Grade 1-3): Use very simple language, short sentences, many analogies, and a very encouraging tone. Avoid any technical jargon. Focus on basic observable facts.",
+        "upper-primary": "Upper Primary (Grade 4-6): Use clear, straightforward language. Introduce basic terms but explain them simply. Focus on 'how' things work at a superficial level.",
+        "junior-school": "Junior School (Grade 7-9): Use moderate complexity. Introduce more formal terminology and conceptual depth. Align with the intermediate transition in the KICD curriculum.",
+        "senior-school": "Senior School (Grade 10-12): Use academic and technical language. Focus on deep conceptual understanding, equations where applicable, and preparing for national exams (KCSE level).",
+        "university": "University / Tertiary (CUE): Use high-level academic rigor, complex theories, professional terminology, and critical analysis. Assume a strong foundational background."
+    };
+
     const systemPrompt = `You are the Educator Agent for MwalimuSmart. Your task is to take a student's topic and break it down into a comprehensive, highly educational lesson consisting of 4 to 7 clear and logical steps. Adjust the number of steps based on the complexity of the topic.
+
+Target Education Level: ${levelGuidelines[level] || levelGuidelines["senior-school"]}
 
 For each step, you must provide:
 1. A descriptive title.
@@ -150,14 +158,25 @@ export async function generateVisualInstructions(
     stepText,
     stepNumber,
     topic,
-    script
+    script,
+    level = "senior-school"
 ) {
 
     const model = genAI.getGenerativeModel({
         model: GEMINI_MODEL
     });
 
+    const levelVisualGuideline = {
+        "lower-primary": "Keep diagrams extremely simple. Use bright colors and basic shapes. Focus on one main idea per step.",
+        "upper-primary": "Use clear diagrams with labels. Focus on show-and-tell style visuals.",
+        "junior-school": "Introduce more detailed diagrams, parts of a system, and basic process flows.",
+        "senior-school": "Use technical diagrams, chemical structures, physics forces, and detailed mathematical representations.",
+        "university": "Professional-grade academic illustrations, complex molecular structures, intricate flowcharts, and rigorous data visualizations."
+    };
+
     const prompt = `You are a visual instruction generator for an educational whiteboard. Given a lesson step, generate simple drawing instructions that can be rendered on an HTML canvas.
+
+Target Simplicity Level: ${levelVisualGuideline[level] || levelVisualGuideline["senior-school"]}
 
 Lesson Step ${stepNumber}: "${stepText}"
 

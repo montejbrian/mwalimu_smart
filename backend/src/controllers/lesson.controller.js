@@ -4,15 +4,15 @@ import { generateEducationalImage, shouldUseAIImage } from '../services/stable-d
 /*Generate a lesson from a question and optional image*/
 export async function generateLessonController(req, res) {
     try {
-        const { question, image } = req.body;
+        const { question, image, level } = req.body;
 
         if (!question || typeof question !== 'string') {
             return res.status(400).json({ error: 'Question is required and must be a string' });
         }
 
-        console.log(`Generating lesson for question: "${question}" with image: ${image ? 'yes' : 'no'}`);
+        console.log(`Generating lesson for question: "${question}" with image: ${image ? 'yes' : 'no'} and level: ${level}`);
 
-        const lessonData = await generateLesson(question, image);
+        const lessonData = await generateLesson(question, image, level);
 
         console.log(`Generated lesson: "${lessonData.title}" with ${lessonData.steps.length} steps and scripts.`);
 
@@ -47,7 +47,7 @@ export async function generateAudioController(req, res) {
 /*Generate visual instructions for a step*/
 export async function generateVisualController(req, res) {
     try {
-        const { stepText, stepNumber, topic, script } = req.body;
+        const { stepText, stepNumber, topic, script, level } = req.body;
 
         if (!stepText || typeof stepText !== 'string') {
             return res.status(400).json({ error: 'stepText is required and must be a string' });
@@ -73,11 +73,11 @@ export async function generateVisualController(req, res) {
             } catch (manimError) {
                 console.warn('Manim generation failed, falling back to canvas instructions:', manimError.message);
                 // Fallback to canvas
-                const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script);
+                const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script, level);
                 return res.json({ instructions });
             }
         } else {
-            const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script);
+            const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script, level);
             return res.json({ instructions });
         }
 

@@ -1,11 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import dotenv from 'dotenv';
 import { cleanJsonString } from './gemini.service.js';
 
-dotenv.config();
-
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 // System prompt designed to act as an encouraging tutor and optionally return drawing instructions.
 const QA_SYSTEM_PROMPT = `You are MwalimuSmart, an expert and highly encouraging AI tutor for students (aligned with the Kenyan curriculum, but broadly applicable to all school subjects).
@@ -42,13 +39,22 @@ Do NOT include any comments inside the JSON array or object.`;
  * Handle a conversational Q&A turn.
  * @param {Array} history - Array of previous message objects.
  * @param {string} newQuestion - The latest question from the user
+ * @param {string} level - The student's education level
  * @returns {Promise<Object>} - Object with { text: string, visuals?: Array }
  */
-export async function askQuestion(history, newQuestion) {
+export async function askQuestion(history, newQuestion, level = "senior-school") {
     try {
+        const levelGuidelines = {
+            "lower-primary": "Target Level: Lower Primary (Grade 1-3). Use extremely simple words, short sentences, and many analogies. Be very encouraging and like a friendly big sibling.",
+            "upper-primary": "Target Level: Upper Primary (Grade 4-6). Use clear language and basic terms. Explain things step-by-step with simple examples.",
+            "junior-school": "Target Level: Junior School (Grade 7-9). Use moderate complexity and introduce more formal subject terminology.",
+            "senior-school": "Target Level: Senior School (Grade 10-12). Use technical and academic language suitable for KCSE preparation. Focus on deep understanding.",
+            "university": "Target Level: University / Tertiary (CUE). Use high-level academic rigor, complex theories, and professional terminology."
+        };
+
         const model = genAI.getGenerativeModel({
             model: GEMINI_MODEL,
-            systemInstruction: QA_SYSTEM_PROMPT,
+            systemInstruction: `${QA_SYSTEM_PROMPT}\n\n${levelGuidelines[level] || levelGuidelines["senior-school"]}`,
         });
 
         // Sanitize history to ensure it matches Gemini's expected format:
