@@ -3,8 +3,16 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-// Initialize the Text-to-Speech client
-const client = new TextToSpeechClient();
+// Initialize the Text-to-Speech client lazily to avoid potential startup hangs
+let client = null;
+
+function getTTSClient() {
+    if (!client) {
+        console.log("Initializing Google Text-to-Speech client...");
+        client = new TextToSpeechClient();
+    }
+    return client;
+}
 
 const CACHE_DIR = path.join(process.cwd(), 'cache', 'audio');
 
@@ -49,7 +57,7 @@ export async function generateAudio(text) {
             }
         };
 
-        const [response] = await client.synthesizeSpeech(request);
+        const [response] = await getTTSClient().synthesizeSpeech(request);
 
         if (!response.audioContent) {
             throw new Error('No audio content received from TTS service');

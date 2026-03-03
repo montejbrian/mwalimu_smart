@@ -5,7 +5,7 @@ import { generateAudio } from './tts.service.js';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 
 
 /*Helper to retry an operation with exponential backoff*/

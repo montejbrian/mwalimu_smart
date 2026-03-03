@@ -16,7 +16,8 @@ os.makedirs(VIDEO_DIR, exist_ok=True)
 def generate_manim_code(step_text: str, topic: str, script: str = None, error_log: str = None, previous_code: str = None) -> str:
     """Manim Programmer Agent: Generates Manim code, potentially correcting previous errors."""
     
-    model = genai.GenerativeModel('gemini-1.5-flash') # Using Flash for better availability and quota
+    model_name = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
+    model = genai.GenerativeModel(model_name) # Using configurable model
     
     if error_log and previous_code:
         prompt = f"""You are a Manim Programmer Agent. Your previous attempt to generate code failed with an error. 

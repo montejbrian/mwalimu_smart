@@ -5,7 +5,7 @@ import { cleanJsonString } from './gemini.service.js';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 
 // System prompt designed to act as an encouraging tutor and optionally return drawing instructions.
 const QA_SYSTEM_PROMPT = `You are MwalimuSmart, an expert and highly encouraging AI tutor for students (aligned with the Kenyan curriculum, but broadly applicable to all school subjects).
@@ -51,18 +51,48 @@ export async function askQuestion(history, newQuestion) {
             systemInstruction: QA_SYSTEM_PROMPT,
         });
 
-        const chat = model.startChat({
-            history: history || [],
+        // Sanitize history to ensure it matches Gemini's expected format:
+        // { role: 'user'|'model', parts: [{ text: '...' }] }
+        const sanitizedHistory = (history || []).map(msg => {
+            // Map 'assistant' to 'model' if necessary
+            const role = (msg.role === 'assistant' || msg.role === 'model') ? 'model' : 'user';
+
+            // Handle both '{ content: "..." }' and '{ parts: [{ text: "..." }] }'
+            let parts = msg.parts;
+            if (!parts && (msg.content || msg.text)) {
+                parts = [{ text: msg.content || msg.text }];
+            }
+
+            return { role, parts: parts || [] };
         });
 
+        // Ensure the conversation starts with a 'user' message as required by Gemini
+        while (sanitizedHistory.length > 0 && sanitizedHistory[0].role !== 'user') {
+            sanitizedHistory.shift();
+        }
+
+        const chat = model.startChat({
+            history: sanitizedHistory,
+        });
+
+        console.log("Q&A: Sending message to Gemini...");
         const result = await chat.sendMessage([{ text: newQuestion }]);
+
+        if (!result || !result.response) {
+            console.error("Q&A: No response from Gemini");
+            throw new Error('No response from Gemini');
+        }
+
         const responseText = result.response.text();
+        console.log("Q&A: Received response text:", responseText.substring(0, 50) + "...");
 
         try {
             const cleaned = cleanJsonString(responseText);
-            return JSON.parse(cleaned);
+            const parsed = JSON.parse(cleaned);
+            console.log("Q&A: Parsed response successfully");
+            return parsed;
         } catch (parseError) {
-            console.warn("Failed to parse QA JSON response, falling back to raw text:", parseError);
+            console.warn("Q&A: Failed to parse QA JSON response, falling back to raw text:", parseError.message);
             // Fallback if the model ignores the JSON instruction
             return {
                 text: responseText,
@@ -70,7 +100,7 @@ export async function askQuestion(history, newQuestion) {
             };
         }
     } catch (error) {
-        console.error('Error generated Q&A response from Gemini:', error);
-        throw new Error('Failed to generate response from the AI tutor.');
+        console.error('Q&A: Critical Error in askQuestion:', error);
+        throw new Error('Failed to generate response from the AI tutor: ' + error.message);
     }
 }

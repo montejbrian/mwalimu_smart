@@ -62,4 +62,13 @@ app.listen(PORT, () => {
     }
 });
 
+// Capture unhandled rejections and exceptions
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception thrown:', err);
+});
+
 export default app;
