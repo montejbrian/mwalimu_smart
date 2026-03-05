@@ -57,7 +57,11 @@ app.listen(PORT, () => {
 
     if (!process.env.GEMINI_API_KEY) {
         console.warn('WARNING: GEMINI_API_KEY not set in environment variables');
+    } else {
+        console.log('GEMINI_API_KEY is present (starts with: ' + process.env.GEMINI_API_KEY.substring(0, 10) + '...)');
     }
+    console.log('GEMINI_MODEL is set to:', process.env.GEMINI_MODEL || 'gemini-1.5-flash (default)');
+
 });
 
 // Capture unhandled rejections and exceptions

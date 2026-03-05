@@ -1,8 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { generateAudio } from './tts.service.js';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const getGenAI = () => new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const getModelName = () => process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 
 /*Helper to retry an operation with exponential backoff*/
@@ -18,12 +18,29 @@ async function retryOperation(
             return await operation();
         } catch (error) {
             lastError = error;
-            const delay = baseDelay * Math.pow(2, i);
-            console.warn(`Attempt ${i + 1}/${maxRetries} failed. Retrying in ${delay}ms...`);
-            if (i < maxRetries - 1) {
-                await new Promise(resolve => setTimeout(resolve, delay));
+
+            // For rate limit errors, use much longer delays
+            const isRateLimit = error.status === 429;
+            const effectiveDelay = isRateLimit
+                ? 15000 * Math.pow(2, i) // 15s, 30s, 60s for rate limits
+                : baseDelay * Math.pow(2, i);
+            const effectiveMaxRetries = isRateLimit ? Math.max(maxRetries, 4) : maxRetries;
+
+            console.warn(`Attempt ${i + 1}/${effectiveMaxRetries} failed${isRateLimit ? ' (RATE LIMITED)' : ''}. Retrying in ${effectiveDelay}ms...`);
+
+            if (i < effectiveMaxRetries - 1) {
+                await new Promise(resolve => setTimeout(resolve, effectiveDelay));
+            } else {
+                break;
             }
         }
+    }
+
+    // Provide a clearer error message for rate limits
+    if (lastError?.status === 429) {
+        const err = new Error('Gemini API rate limit exceeded. Please wait a minute and try again.');
+        err.status = 429;
+        throw err;
     }
 
     throw lastError;
@@ -58,8 +75,8 @@ export async function generateLesson(
     imageBase64,
     level = "senior-school"
 ) {
-    const model = genAI.getGenerativeModel({
-        model: GEMINI_MODEL
+    const model = getGenAI().getGenerativeModel({
+        model: getModelName()
     });
 
     const levelGuidelines = {
@@ -129,6 +146,7 @@ Guidelines:
         const lessonData = JSON.parse(cleanedText);
         return lessonData;
     } catch (error) {
+        if (error.status === 429) throw error;
         console.error('Failed to parse Gemini response for Lesson:', error);
         throw new Error('Failed to parse lesson data from AI response');
     }
@@ -162,8 +180,8 @@ export async function generateVisualInstructions(
     level = "senior-school"
 ) {
 
-    const model = genAI.getGenerativeModel({
-        model: GEMINI_MODEL
+    const model = getGenAI().getGenerativeModel({
+        model: getModelName()
     });
 
     const levelVisualGuideline = {
@@ -212,6 +230,7 @@ Example output:
         const instructions = JSON.parse(cleanedText);
         return instructions;
     } catch (error) {
+        if (error.status === 429) throw error;
         console.error('Failed to parse Gemini response for Visuals:', error);
         throw new Error('Failed to parse visual instructions from AI response');
     }

@@ -1,8 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { cleanJsonString } from './gemini.service.js';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const getGenAI = () => new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const getModelName = () => process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 // System prompt designed to act as an encouraging tutor and optionally return drawing instructions.
 const QA_SYSTEM_PROMPT = `You are MwalimuSmart, an expert and highly encouraging AI tutor for students (aligned with the Kenyan curriculum, but broadly applicable to all school subjects).
@@ -52,8 +52,8 @@ export async function askQuestion(history, newQuestion, level = "senior-school")
             "university": "Target Level: University / Tertiary (CUE). Use high-level academic rigor, complex theories, and professional terminology."
         };
 
-        const model = genAI.getGenerativeModel({
-            model: GEMINI_MODEL,
+        const model = getGenAI().getGenerativeModel({
+            model: getModelName(),
             systemInstruction: `${QA_SYSTEM_PROMPT}\n\n${levelGuidelines[level] || levelGuidelines["senior-school"]}`,
         });
 
