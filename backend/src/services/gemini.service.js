@@ -69,11 +69,12 @@ export function cleanJsonString(text) {
     return cleaned.trim();
 }
 
-/*Generate a structured lesson from a question and optional image*/
+/*Generate a structured lesson from a question, optional image, and optional weaknesses for reteaching*/
 export async function generateLesson(
     question,
     imageBase64,
-    level = "senior-school"
+    level = "senior-school",
+    weaknesses = null
 ) {
     const model = getGenAI().getGenerativeModel({
         model: getModelName()
@@ -87,9 +88,17 @@ export async function generateLesson(
         "university": "University / Tertiary (CUE): Use high-level academic rigor, complex theories, professional terminology, and critical analysis. Assume a strong foundational background."
     };
 
+    let contextPrompt = "";
+    if (weaknesses && weaknesses.length > 0) {
+        contextPrompt = `\n\n**RETEACHING MODE**: The student recently took a quiz on this topic and struggled with the following concepts or questions:
+${weaknesses.map(w => `- Question: ${w.questionText}\n  Correct Answer: ${w.correctAnswer}\n  Explanation: ${w.explanation}`).join('\n')}
+
+Your goal is to RETEACH these specific areas. Do not just repeat the previous explanation. Use different analogies, break it down further, and address the specific confusion points identified above.`;
+    }
+
     const systemPrompt = `You are the Educator Agent for MwalimuSmart. Your task is to take a student's topic and break it down into a comprehensive, highly educational lesson consisting of 4 to 7 clear and logical steps. Adjust the number of steps based on the complexity of the topic.
 
-Target Education Level: ${levelGuidelines[level] || levelGuidelines["senior-school"]}
+Target Education Level: ${levelGuidelines[level] || levelGuidelines["senior-school"]}${contextPrompt}
 
 For each step, you must provide:
 1. A descriptive title.

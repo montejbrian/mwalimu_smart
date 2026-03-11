@@ -13,9 +13,29 @@ export async function generateLessonController(req, res) {
         console.log(`Generating lesson for question: "${question}" with image: ${image ? 'yes' : 'no'} and level: ${level}`);
 
         const lessonData = await generateLesson(question, image, level);
+        
+        // Background Pre-generation of assets (Audio and Visuals)
+        // We don't await this so the response goes back to the user quickly
+        (async () => {
+            console.log(`Starting background asset generation for ${lessonData.steps.length} steps...`);
+            const assetPromises = lessonData.steps.flatMap(step => [
+                generateAudioNarration(step.script).catch(e => console.error(`Bg Audio Error: ${e.message}`)),
+                generateVisualInstructions(step.text, step.id, lessonData.title, step.script, level).catch(e => console.error(`Bg Visual Error: ${e.message}`))
+            ]);
+            // Also trigger Manim rendering in background if applicable
+            const manimTopics = ['math', 'physics', 'geometry', 'theorem', 'equation', 'pythagorean'];
+            const isManim = manimTopics.some(t => lessonData.title.toLowerCase().includes(t));
+            if (isManim) {
+                const { generateManimAnimation } = await import('../services/manim.service.js');
+                lessonData.steps.forEach(step => {
+                    generateManimAnimation(step.text, step.id, lessonData.title, step.script).catch(e => console.error(`Bg Manim Error: ${e.message}`));
+                });
+            }
+            await Promise.allSettled(assetPromises);
+            console.log("Background asset pre-generation completed (or settled).");
+        })();
 
         console.log(`Generated lesson: "${lessonData.title}" with ${lessonData.steps.length} steps and scripts.`);
-
         return res.json(lessonData);
     } catch (error) {
         console.error('Error generating lesson:', error);
@@ -63,16 +83,31 @@ export async function generateVisualController(req, res) {
 
         if (isManim) {
             try {
-                // Import the manim service dynamically to avoid issues if the python server is down
-                const { generateManimAnimation } = await import('../services/manim.service.js');
-                const manimResult = await generateManimAnimation(stepText, stepNumber, topic, script);
-                return res.json({
-                    isVideo: true,
-                    videoBase64: manimResult.videoBase64
-                });
+                const { generateManimAnimation, checkManimCache } = await import('../services/manim.service.js');
+                
+                // 1. Check if Manim is already cached
+                const isCached = await checkManimCache(stepText, topic, script);
+                
+                if (isCached) {
+                    // Video is ready, return it immediately
+                    const manimResult = await generateManimAnimation(stepText, stepNumber, topic, script);
+                    return res.json({
+                        isVideo: true,
+                        videoBase64: manimResult.videoBase64
+                    });
+                } else {
+                    // Video not ready, trigger background generation and return canvas fallback immediately
+                    console.log(`Manim cache miss for step ${stepNumber}. Triggering background render and returning canvas fallback.`);
+                    generateManimAnimation(stepText, stepNumber, topic, script).catch(e => console.error(`Bg Manim Error: ${e.message}`));
+                    
+                    const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script, level);
+                    return res.json({ 
+                        instructions,
+                        videoStatus: 'rendering' // Optional hint for frontend
+                    });
+                }
             } catch (manimError) {
-                console.warn('Manim generation failed, falling back to canvas instructions:', manimError.message);
-                // Fallback to canvas
+                console.warn('Manim logic failed, falling back to canvas instructions:', manimError.message);
                 const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script, level);
                 return res.json({ instructions });
             }

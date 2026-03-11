@@ -1,9 +1,13 @@
-from flask import Flask, request, jsonify, send_file
-from flask_cors import CORS
 import os
+import sys
+# Add the current directory to sys.path to ensure local imports like manim_generator work
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import json
-from manim_generator import generate_animation
-from dotenv import load_dotenv
+from manim_generator import generate_animation  # pyre-ignore[21]
+from flask import Flask, request, jsonify, send_file  # pyre-ignore[21]
+from flask_cors import CORS  # pyre-ignore[21]
+from dotenv import load_dotenv  # pyre-ignore[21]
 
 load_dotenv()
 
@@ -17,6 +21,20 @@ os.makedirs(VIDEO_DIR, exist_ok=True)
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok', 'service': 'manim-animation'})
+
+@app.route('/check-cache', methods=['POST'])
+def check_cache():
+    import hashlib
+    data = request.json
+    step_text = data.get('stepText')
+    topic = data.get('topic', 'general')
+    script = data.get('script')
+    
+    cache_key = hashlib.md5(f"{topic}:{step_text}:{script}".encode()).hexdigest()
+    video_filename = f"animation_{cache_key}.mp4"
+    video_path = os.path.join(VIDEO_DIR, video_filename)
+    
+    return jsonify({'exists': os.path.exists(video_path)})
 
 @app.route('/generate-animation', methods=['POST'])
 def generate_animation_endpoint():

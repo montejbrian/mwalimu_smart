@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import lessonRoutes from './routes/lesson.routes.js';
 import qaRoutes from './routes/qa.routes.js';
+import exportRoutes from './routes/export.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -34,6 +35,7 @@ app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
 // Routes
 app.use('/api', lessonRoutes);
 app.use('/api/qa', qaRoutes);
+app.use('/api/export', exportRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

@@ -69,7 +69,7 @@ class ExperimentRunner:
         treatment_gains = self._extract_metric(self.experiment.treatment_group, get_gain)
         control_gains = self._extract_metric(self.experiment.control_group, get_gain)
         
-        results = {
+        results: Dict[str, Any] = {
             "treatment_n": len(treatment_gains),
             "control_n": len(control_gains),
             "treatment_mean_gain": statistics.mean(treatment_gains) if treatment_gains else 0.0,
@@ -81,7 +81,7 @@ class ExperimentRunner:
             t_stat, p_val = stats.ttest_ind(treatment_gains, control_gains, equal_var=False) # Welch's t-test
             results["t_statistic"] = float(t_stat)
             results["p_value"] = float(p_val)
-            results["statistically_significant"] = p_val < 0.05
+            results["statistically_significant"] = bool(p_val < 0.05)
         else:
             results["t_statistic"] = None
             results["p_value"] = None

@@ -110,3 +110,107 @@ export async function askQuestion(history, newQuestion, level = "senior-school")
         throw new Error('Failed to generate response from the AI tutor: ' + error.message);
     }
 }
+/**
+ * Generates a quiz based on the lesson content.
+ * @param {Object} lessonContent - The lesson data containing title and steps.
+ * @param {string} level - Education level.
+ * @returns {Promise<Object>} - Quiz data with questions and options.
+ */
+export async function generateQuiz(lessonContent, level = "senior-school") {
+    try {
+        const model = getGenAI().getGenerativeModel({
+            model: getModelName(),
+        });
+
+        const prompt = `You are an expert examiner for MwalimuSmart. Based on the following lesson content, generate a clear and effective multiple-choice quiz to test the student's understanding.
+
+Lesson Title: ${lessonContent.title}
+Lesson Content:
+${lessonContent.steps.map(s => `Step ${s.id}: ${s.text}`).join('\n')}
+
+Guidelines:
+1. Generate exactly 3-5 high-quality multiple-choice questions.
+2. Each question must target a specific concept from the lesson steps.
+3. For each question, provide 4 options (A, B, C, D).
+4. Clearly state the 'correctAnswer' (A, B, C, or D) and the 'relatedStepId' (the id of the lesson step this question tests).
+5. Ensure the tone is academic but encouraging.
+
+Return your response as a strictly valid JSON object:
+\`\`\`json
+{
+  "quizTitle": "Quiz: ${lessonContent.title}",
+  "questions": [
+    {
+      "id": "q1",
+      "question": "The question text?",
+      "options": {
+        "A": "Option text",
+        "B": "Option text",
+        "C": "Option text",
+        "D": "Option text"
+      },
+      "correctAnswer": "B",
+      "relatedStepId": "1",
+      "explanation": "Brief explanation of why B is correct."
+    }
+    // ... more questions
+  ]
+}
+\`\`\``;
+
+        console.log("Quiz: Generating questions...");
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+        const cleaned = cleanJsonString(text);
+        return JSON.parse(cleaned);
+    } catch (error) {
+        console.error('Quiz: Failed to generate quiz:', error);
+        throw new Error('Failed to generate quiz: ' + error.message);
+    }
+}
+
+/**
+ * Analyzes the student's quiz results to identify weaknesses.
+ * @param {Object} lessonContent - The original lesson data.
+ * @param {Array} studentAnswers - Array of { questionId: string, answer: string }.
+ * @param {Object} quizData - The generated quiz data.
+ * @returns {Object} - Analysis of weaknesses and steps to reteach.
+ */
+export function analyzeAssessment(lessonContent, studentAnswers, quizData) {
+    const weaknesses = [];
+    const correctStepIds = new Set();
+    const incorrectStepIds = new Set();
+
+    studentAnswers.forEach(submission => {
+        const question = quizData.questions.find(q => q.id === submission.questionId);
+        if (question) {
+            const isCorrect = question.correctAnswer === submission.answer;
+            if (isCorrect) {
+                correctStepIds.add(question.relatedStepId);
+            } else {
+                incorrectStepIds.add(question.relatedStepId);
+                weaknesses.push({
+                    questionId: question.id,
+                    questionText: question.question,
+                    submittedAnswer: submission.answer,
+                    correctAnswer: question.correctAnswer,
+                    explanation: question.explanation,
+                    relatedStepId: question.relatedStepId
+                });
+            }
+        }
+    });
+
+    // Identify steps where the student showed weakness (incorrect answers)
+    // even if they got another question on the same step correct.
+    const stepsToReteach = Array.from(incorrectStepIds).map(id => {
+        return lessonContent.steps.find(s => s.id === id);
+    }).filter(s => s !== undefined);
+
+    return {
+        score: studentAnswers.length > 0 ? (studentAnswers.length - weaknesses.length) / studentAnswers.length * 100 : 0,
+        weaknesses,
+        stepsToReteach,
+        isPass: weaknesses.length === 0
+    };
+}

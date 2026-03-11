@@ -34,3 +34,22 @@ export async function generateManimAnimation(stepText, stepNumber, topic, script
         throw error;
     }
 }
+
+/**
+ * Checks if an animation is already cached in the Manim service.
+ */
+export async function checkManimCache(stepText, topic, script) {
+    try {
+        const response = await axios.post(`${MANIM_SERVICE_URL}/check-cache`, {
+            stepText,
+            topic,
+            script
+        }, {
+            timeout: 5000
+        });
+        return !!response.data?.exists;
+    } catch (error) {
+        console.warn('Failed to check Manim cache:', error.message);
+        return false;
+    }
+}
