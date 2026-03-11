@@ -1,21 +1,31 @@
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 
 const HF_API_URL = 'https://router.huggingface.co/hf-inference/v1/models/stabilityai/stable-diffusion-xl-base-1.0';
 const HF_API_KEY = process.env.HUGGINGFACE_API_KEY || '';
 
-const imageCache = new Map();
+const CACHE_DIR = path.join(process.cwd(), 'cache', 'images');
+function ensureCacheDir() {
+    if (!fs.existsSync(CACHE_DIR)) {
+        fs.mkdirSync(CACHE_DIR, { recursive: true });
+    }
+}
 
-/*Generate an educational image using Stable Diffusion*/
 export async function generateEducationalImage(
     topic,
     description
 ) {
-    const cacheKey = `${topic}:${description}`;
+    const cacheRaw = `${topic}:${description}`;
+    const hash = crypto.createHash('md5').update(cacheRaw).digest('hex');
+    const cacheFilePath = path.join(CACHE_DIR, `${hash}.png`);
 
-    if (imageCache.has(cacheKey)) {
-        console.log('Using cached image for:', topic);
+    if (fs.existsSync(cacheFilePath)) {
+        console.log('Using cached image (disk) for:', topic);
+        const imageBuffer = fs.readFileSync(cacheFilePath);
         return {
-            imageBase64: imageCache.get(cacheKey),
+            imageBase64: imageBuffer.toString('base64'),
             cached: true
         };
     }
@@ -41,11 +51,17 @@ export async function generateEducationalImage(
             }
         );
 
+        ensureCacheDir();
         // Convert to base64
-        const imageBase64 = Buffer.from(response.data).toString('base64');
+        const imageBuffer = Buffer.from(response.data);
+        const imageBase64 = imageBuffer.toString('base64');
 
-        // Cache the result
-        imageCache.set(cacheKey, imageBase64);
+        // Cache the result to disk
+        try {
+            fs.writeFileSync(cacheFilePath, imageBuffer);
+        } catch (e) {
+            console.error('Failed to write to image cache:', e);
+        }
 
         console.log('Generated new image for:', topic);
         return {

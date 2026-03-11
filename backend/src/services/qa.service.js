@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { cleanJsonString } from './gemini.service.js';
+import axios from 'axios';
 
 const getGenAI = () => new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const getModelName = () => process.env.GEMINI_MODEL || 'gemini-2.5-flash';
@@ -117,6 +118,45 @@ export async function askQuestion(history, newQuestion, level = "senior-school")
  * @returns {Promise<Object>} - Quiz data with questions and options.
  */
 export async function generateQuiz(lessonContent, level = "senior-school") {
+    // Attempt to use the advanced Python QuestionGenerator first
+    try {
+        const manimPort = process.env.MANIM_PORT || '5000';
+        const manimUrl = `http://localhost:${manimPort}/generate-questions`;
+        
+        console.log(`Quiz: Attempting advanced generation via Manim Service at ${manimUrl}...`);
+        
+        const manimResponse = await axios.post(manimUrl, {
+            lessonContent: JSON.stringify(lessonContent.steps.map(s => s.text).join('\n')),
+            topic: lessonContent.title,
+            numQuestions: 5
+        }, { timeout: 45000 });
+
+        if (manimResponse.data && manimResponse.data.success && manimResponse.data.questions.length > 0) {
+            console.log("Quiz: Successfully generated advanced questions from Python service.");
+            
+            // Map the Python generator's format to our internal quiz format
+            const formattedQuestions = manimResponse.data.questions.map((q, idx) => ({
+                id: `q${idx + 1}`,
+                question: q.question,
+                options: q.options,
+                correctAnswer: q.correct_answer,
+                relatedStepId: q.relatedStepId || "1", // Fallback if not specified
+                explanation: q.explanation,
+                distractorExplanations: q.distractor_explanations,
+                bloomLevel: q.bloom_level,
+                concept: q.concept
+            }));
+
+            return {
+                quizTitle: `Advanced Quiz: ${lessonContent.title}`,
+                questions: formattedQuestions
+            };
+        }
+    } catch (manimError) {
+        console.warn('Quiz: Advanced Python generation failed or timed out. Falling back to Gemini.', manimError.message);
+    }
+
+    // Fallback to Gemini generation
     try {
         const model = getGenAI().getGenerativeModel({
             model: getModelName(),
@@ -153,18 +193,17 @@ Return your response as a strictly valid JSON object:
       "relatedStepId": "1",
       "explanation": "Brief explanation of why B is correct."
     }
-    // ... more questions
   ]
 }
 \`\`\``;
 
-        console.log("Quiz: Generating questions...");
+        console.log("Quiz: Generating questions via Gemini (Fallback)...");
         const result = await model.generateContent(prompt);
         const text = result.response.text();
         const cleaned = cleanJsonString(text);
         return JSON.parse(cleaned);
     } catch (error) {
-        console.error('Quiz: Failed to generate quiz:', error);
+        console.error('Quiz: Failed to generate quiz (Gemini Fallback):', error);
         throw new Error('Failed to generate quiz: ' + error.message);
     }
 }

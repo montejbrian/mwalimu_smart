@@ -13,10 +13,14 @@ genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), 'videos')
 os.makedirs(VIDEO_DIR, exist_ok=True)
 
-def generate_manim_code(step_text: str, topic: str, script: str = None, error_log: str = None, previous_code: str = None) -> str:
+from typing import Optional
+
+def generate_manim_code(step_text: str, topic: str, script: Optional[str] = None, error_log: Optional[str] = None, previous_code: Optional[str] = None) -> str:
     """Manim Programmer Agent: Generates Manim code, potentially correcting previous errors."""
     
     model_name = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
+    if model_name == 'gemini-2.5-flash':
+        print(f"\n[SYSTEM WARNING] Model '{model_name}' is requested. If this fails, consider 'gemini-1.5-flash'.\n")
     model = genai.GenerativeModel(model_name) # Using configurable model
     
     if error_log and previous_code:
@@ -81,7 +85,7 @@ class GeneratedScene(VoiceoverScene):
     
     return code.strip()
 
-def generate_animation(step_text: str, step_number: int, topic: str, script: str = None) -> str:
+def generate_animation(step_text: str, step_number: int, topic: str, script: Optional[str] = None) -> str:
     """Generate Manim animation with a self-correction loop."""
     
     # Create cache key
@@ -95,8 +99,8 @@ def generate_animation(step_text: str, step_number: int, topic: str, script: str
         return video_path
     
     max_attempts = 3
-    error_log = None
-    previous_code = None
+    error_log: Optional[str] = None
+    previous_code: Optional[str] = None
     
     for attempt in range(max_attempts):
         try:

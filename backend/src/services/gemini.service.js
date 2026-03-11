@@ -1,5 +1,16 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { generateAudio } from './tts.service.js';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+
+const CACHE_DIR = path.join(process.cwd(), 'cache', 'visuals');
+
+function ensureCacheDir() {
+    if (!fs.existsSync(CACHE_DIR)) {
+        fs.mkdirSync(CACHE_DIR, { recursive: true });
+    }
+}
 
 const getGenAI = () => new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const getModelName = () => process.env.GEMINI_MODEL || 'gemini-2.5-flash';
@@ -44,6 +55,15 @@ async function retryOperation(
     }
 
     throw lastError;
+}
+
+/**
+ * Validates the model name and provides feedback if it's likely incorrect.
+ */
+async function validateModel(modelName) {
+    if (modelName === 'gemini-2.5-flash') {
+        console.warn("\n[SYSTEM WARNING] Model 'gemini-2.5-flash' is requested. If you see 404/400 errors, this version might not be available in your region yet. Consider 'gemini-1.5-flash' for stability.\n");
+    }
 }
 
 /*Helper to clean JSON string from markdown code blocks and comments*/
@@ -224,19 +244,37 @@ Guidelines:
 - Keep it simple and educational. Focus on diagrams, labels, and key visual elements.
 - IMPORTANT: Return strictly valid JSON. Do not include comments (// or /* */) in the response.
 
-Example output:
 [
   {"type": "circle", "x": 400, "y": 300, "radius": 50, "color": "#3b82f6"},
   {"type": "text", "x": 400, "y": 400, "text": "H2O(l)", "fontSize": 24, "color": "#333333", "isFormula": true, "highlight": true}
 ]`;
 
     try {
+        // 1. Check Cache
+        const cacheRaw = `${topic}:${stepText}:${script}:${level}`;
+        const hash = crypto.createHash('md5').update(cacheRaw).digest('hex');
+        const cacheFilePath = path.join(CACHE_DIR, `${hash}.json`);
+
+        if (fs.existsSync(cacheFilePath)) {
+            console.log(`Visual cache hit for step ${stepNumber}: ${topic}`);
+            const cachedData = fs.readFileSync(cacheFilePath, 'utf8');
+            return JSON.parse(cachedData);
+        }
+
+        console.log(`Visual cache miss for step ${stepNumber}. Generating...`);
+        ensureCacheDir();
         const result = await retryOperation(() => model.generateContent(prompt));
         const response = result.response;
         const text = response.text();
 
         const cleanedText = cleanJsonString(text);
         const instructions = JSON.parse(cleanedText);
+
+        // 2. Save to Cache
+        try {
+            fs.writeFileSync(cacheFilePath, JSON.stringify(instructions));
+        } catch (e) { console.error("Visual cache write error:", e); }
+
         return instructions;
     } catch (error) {
         if (error.status === 429) throw error;

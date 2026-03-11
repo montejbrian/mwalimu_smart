@@ -16,9 +16,10 @@ function getTTSClient() {
 
 const CACHE_DIR = path.join(process.cwd(), 'cache', 'audio');
 
-// Ensure cache directory exists
-if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
+function ensureCacheDir() {
+    if (!fs.existsSync(CACHE_DIR)) {
+        fs.mkdirSync(CACHE_DIR, { recursive: true });
+    }
 }
 
 /**
@@ -39,6 +40,7 @@ export async function generateAudio(text) {
             return audioBuffer.toString('base64');
         }
 
+        ensureCacheDir();
         console.log(`Audio cache miss. Generating for: "${text.substring(0, 20)}..."`);
 
         // 2. Call Google API

@@ -14,27 +14,6 @@ export async function generateLessonController(req, res) {
 
         const lessonData = await generateLesson(question, image, level);
         
-        // Background Pre-generation of assets (Audio and Visuals)
-        // We don't await this so the response goes back to the user quickly
-        (async () => {
-            console.log(`Starting background asset generation for ${lessonData.steps.length} steps...`);
-            const assetPromises = lessonData.steps.flatMap(step => [
-                generateAudioNarration(step.script).catch(e => console.error(`Bg Audio Error: ${e.message}`)),
-                generateVisualInstructions(step.text, step.id, lessonData.title, step.script, level).catch(e => console.error(`Bg Visual Error: ${e.message}`))
-            ]);
-            // Also trigger Manim rendering in background if applicable
-            const manimTopics = ['math', 'physics', 'geometry', 'theorem', 'equation', 'pythagorean'];
-            const isManim = manimTopics.some(t => lessonData.title.toLowerCase().includes(t));
-            if (isManim) {
-                const { generateManimAnimation } = await import('../services/manim.service.js');
-                lessonData.steps.forEach(step => {
-                    generateManimAnimation(step.text, step.id, lessonData.title, step.script).catch(e => console.error(`Bg Manim Error: ${e.message}`));
-                });
-            }
-            await Promise.allSettled(assetPromises);
-            console.log("Background asset pre-generation completed (or settled).");
-        })();
-
         console.log(`Generated lesson: "${lessonData.title}" with ${lessonData.steps.length} steps and scripts.`);
         return res.json(lessonData);
     } catch (error) {

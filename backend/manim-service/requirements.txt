@@ -6,3 +6,4 @@ python-dotenv>=0.21.0
 manim-voiceover
 gTTS
 pydub
+openai

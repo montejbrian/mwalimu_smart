@@ -5,6 +5,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import json
 from manim_generator import generate_animation  # pyre-ignore[21]
+from question_generator import QuestionGenerator  # pyre-ignore[21]
 from flask import Flask, request, jsonify, send_file  # pyre-ignore[21]
 from flask_cors import CORS  # pyre-ignore[21]
 from dotenv import load_dotenv  # pyre-ignore[21]
@@ -76,6 +77,37 @@ def serve_video(filename):
     if os.path.exists(video_path):
         return send_file(video_path, mimetype='video/mp4')
     return jsonify({'error': 'Video not found'}), 404
+
+@app.route('/generate-questions', methods=['POST'])
+def generate_questions_endpoint():
+    try:
+        data = request.json
+        lesson_content = data.get('lessonContent')
+        topic_name = data.get('topic', 'General Topic')
+        num_questions = data.get('numQuestions', 5)
+        
+        if not lesson_content:
+            return jsonify({'error': 'lessonContent is required'}), 400
+            
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return jsonify({'error': 'OPENAI_API_KEY not configured in Manim Service'}), 500
+            
+        generator = QuestionGenerator(api_key=api_key)
+        questions = generator.generate_questions(
+            lesson_content=lesson_content,
+            topic=topic_name,
+            count=num_questions
+        )
+        
+        return jsonify({
+            'success': True,
+            'questions': [q.to_dict() for q in questions]
+        })
+        
+    except Exception as e:
+        print(f'Error generating questions: {e}')
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('MANIM_PORT', 5000))
