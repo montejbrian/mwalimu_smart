@@ -15,7 +15,7 @@ os.makedirs(VIDEO_DIR, exist_ok=True)
 
 from typing import Optional
 
-def generate_manim_code(step_text: str, topic: str, script: Optional[str] = None, error_log: Optional[str] = None, previous_code: Optional[str] = None) -> str:
+def generate_manim_code(step_text: str, topic: str, script: Optional[str] = None, error_log: str = "", previous_code: str = "") -> str:
     """Manim Programmer Agent: Generates Manim code, potentially correcting previous errors."""
     
     model_name = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
@@ -60,10 +60,17 @@ Topic: {topic}
 Step: {step_text}
 Narration Script: {script or step_text}
 
+# VISUAL ARRANGEMENT
+1. **NO OVERLAP**: Geometric shapes, text, and labels MUST NOT overlap.
+2. **GROUPING**: Use 'VGroup' to manage multiple objects.
+3. **SPACING**: Use '.arrange(DOWN, buff=0.5)' or '.next_to(other_obj, RIGHT, buff=1.0)'.
+4. **LABELS**: Always place labels using '.next_to(object, direction)' logic.
+5. **DETAIL**: Build rich scenes. If explaining a circuit, show the battery, wires, resistor, and current flow arrows.
+
 # STYLE (CLEAR Framework)
-1. **CONCISE**: Minimal, effective visual animations per step.
+1. **CONCISE**: Every animation must be educational, but NOT sparse. Create a comprehensive visual representation.
 2. **LOGICAL**: Synchronize visuals inside 'with self.voiceover(...) as tracker:' blocks.
-3. **EXPLICIT**: Use EXACT Narration Script. Use Green (#4CAF50) for text unless background is green (then use White).
+3. **EXPLICIT**: Use EXACT Narration Script. High contrast colors only.
 
 # RESPONSE FORMAT
 Return ONLY the complete Python code. No explanations.
@@ -77,8 +84,24 @@ from manim_voiceover.services.gtts import GTTSService
 class GeneratedScene(VoiceoverScene):
     def construct(self):
         self.set_speech_service(GTTSService())
+        
+        # 1. Setup rich environment
+        axes = Axes(x_range=[0, 5], y_range=[0, 5], axis_config={{"include_tip": True}})
+        labels = axes.get_axis_labels(x_label="Time", y_label="Value")
+        
+        # 2. Detailed objects
+        circle = Circle(radius=1.0, color=BLUE).shift(UP*1)
+        dot = Dot(color=YELLOW).move_to(circle.get_start())
+        trace = TracedPath(dot.get_center, stroke_color=YELLOW, stroke_width=4)
+        
+        main_vgroup = VGroup(axes, labels, circle, dot, trace).center()
+        
+        # 3. Synchronized animation
         with self.voiceover(text="EXACT SCRIPT HERE") as tracker:
-            # animations
+            self.play(Create(axes), Write(labels))
+            self.play(Create(circle))
+            self.add(trace)
+            self.play(MoveAlongPath(dot, circle), run_time=tracker.duration)
 ```
 """
     
@@ -107,13 +130,13 @@ def generate_animation(step_text: str, step_number: int, topic: str, script: Opt
         return video_path
     
     max_attempts = 3
-    error_log: Optional[str] = None
-    previous_code: Optional[str] = None
+    error_log: str = ""
+    previous_code: str = ""
     
     for attempt in range(max_attempts):
         try:
             print(f"Attempt {attempt + 1}: Generating Manim code...")
-            manim_code = generate_manim_code(step_text, topic, script, error_log, previous_code)
+            manim_code: str = generate_manim_code(step_text, topic, script, error_log, previous_code)
             previous_code = manim_code
             
             # Create temporary Python file
@@ -139,7 +162,7 @@ def generate_animation(step_text: str, step_number: int, topic: str, script: Opt
             
             if result.returncode != 0:
                 print(f"Attempt {attempt + 1} failed. Capturing error for correction...")
-                error_log = result.stderr
+                error_log = result.stderr or ""
                 continue # Try next attempt with correction
             
             # Find the generated video

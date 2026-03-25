@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-const HF_API_URL = 'https://router.huggingface.co/hf-inference/v1/models/stabilityai/stable-diffusion-xl-base-1.0';
+const HF_API_URL = 'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0';
 const HF_API_KEY = process.env.HUGGINGFACE_API_KEY || '';
 
 const CACHE_DIR = path.join(process.cwd(), 'cache', 'images');

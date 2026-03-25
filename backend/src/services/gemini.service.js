@@ -224,39 +224,47 @@ export async function generateVisualInstructions(
         "upper-primary": "Use clear diagrams with labels. Focus on show-and-tell style visuals.",
         "junior-school": "Introduce more detailed diagrams, parts of a system, and basic process flows.",
         "senior-school": "Use technical diagrams, chemical structures, physics forces, and detailed mathematical representations.",
-        "university": "Professional-grade academic illustrations, complex molecular structures, intricate flowcharts, and rigorous data visualizations."
+            "university": "Professional-grade academic illustrations, complex molecular structures, intricate flowcharts, and rigorous data visualizations."
     };
 
     const prompt = `
 # CONTEXT
-You are a visual instruction generator for MwalimuSmart's educational whiteboard. You translate lesson steps into simple drawing instructions for an HTML canvas.
+You are a visual instruction generator for MwalimuSmart's educational whiteboard. You translate lesson steps into clear, non-overlapping drawing instructions for an 800x600 HTML canvas.
 
 # OBJECTIVE
-Generate a logical set of drawing instructions for Lesson Step ${stepNumber}: "${stepText}".
+Generate a logical set of drawing instructions for Lesson Step ${stepNumber}: "${stepText}". Ensure the visual FULLY covers the explanation without clutter.
 
-# TARGET AUDIENCE
-Simplicity Level: ${levelVisualGuideline[level] || levelVisualGuideline["senior-school"]}
+# SPATIAL LAYOUT (800x600 Grid)
+1. **GRID**: Center is (400, 300). Use the full width but keep a 50px margin.
+2. **ARRANGEMENT**: 
+   - Primary Object: Typically at (300, 300) or centered.
+   - Labels/secondary text: Place relative to objects (e.g., if object is at 300, label it at 300, 200).
+3. **OVERLAP PREVENTION**: 
+   - Maintain at least **60px** distance between different text blocks.
+   - Ensure labels do not sit directly on top of geometric shapes unless they are inside them (like a centered label in a circle).
+   - If multiple objects exist, arrange them side-by-side (Horizontal) or top-to-bottom (Vertical).
 
 # STYLE (CLEAR Framework)
-1. **CONCISE**: Use minimal drawing objects to convey the core idea.
-2. **LOGICAL**: Place elements strategically on an 800x600 canvas.
-3. **EXPLICIT**: Use specific colors and clear labels. Highlight formulas and key terms.
+1. **CONCISE**: Every shape must have a purpose, but do NOT be sparse. Use "rich" and "detailed" illustrations.
+2. **LOGICAL**: Group related items visually. Create structured diagrams rather than isolated shapes.
+3. **EXPLICIT**: Use specific colors. Highlight formulas and key terms using "highlight": true.
 
 # RESPONSE FORMAT (Strict JSON)
-Generate instructions as a JSON array of objects:
+Generate a JSON array of objects:
 - type: "circle" | "rectangle" | "line" | "arrow" | "text" | "curve"
-- Coordinates and dimensions for an 800x600 canvas.
-- color: hex color code.
+- Coordinates (x, y) and dimensions for an 800x600 canvas.
+- color: hex color code (e.g., #4CAF50).
 - For text: 
   - text: content
-  - fontSize: number
-  - isFormula: boolean (true for H2O, x^2, etc.)
-  - highlight: boolean (true for key concepts)
+  - fontSize: number (e.g., 20)
+  - isFormula: boolean
+  - highlight: boolean
 
 # GUIDELINES
-- Focus on diagrams, labels, and core visual elements.
-- For formulas, use standard text (e.g., "H2O").
-- Use "highlight": true for essential terms.
+- **RICHNESS**: Aim for 5-10+ visual objects per step to create a comprehensive illustration.
+- **CONTEXT**: Include surrounding elements (e.g., if drawing a cell, draw the nucleus, mitochondria, and cell wall with labels).
+- **CLARITY**: Ensure all important terms in the text have a corresponding visual or label.
+- **DEPTH**: Use different colors and shapes to distinguish parts of a system.
 - Return ONLY the JSON array.
 `;
 
