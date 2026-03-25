@@ -24,43 +24,51 @@ def generate_manim_code(step_text: str, topic: str, script: Optional[str] = None
     model = genai.GenerativeModel(model_name) # Using configurable model
     
     if error_log and previous_code:
-        prompt = f"""You are a Manim Programmer Agent. Your previous attempt to generate code failed with an error. 
-FIX the code based on the error log provided.
+        prompt = f"""
+# CONTEXT
+You are a Manim Programmer Agent for MwalimuSmart. Your previous attempt to generate code failed.
 
-Topic: {topic}
-Original Step: {step_text}
-Narration Script: {script or step_text}
+# OBJECTIVE
+FIX the Manim code for the topic "{topic}" based on the error log provided.
 
-PREVIOUS CODE:
+# STYLE (CLEAR Framework)
+1. **CONCISE**: Fix ONLY the necessary parts.
+2. **LOGICAL**: Ensure a valid 'GeneratedScene' class structure.
+3. **EXPLICIT**: Use EXACT narration scripts in 'voiceover' blocks.
+
+# PREVIOUS ATTEMPT
 ```python
 {previous_code}
 ```
 
-ERROR LOG:
+# ERROR LOG
 {error_log}
 
-REQUIREMENTS:
-1. Fix the error identified in the log.
-2. Return ONLY the complete, corrected Python code.
-3. Ensure you follow all original requirements (VoiceoverScene, GTTSService, color schemes).
+# REQUIREMENTS
+- Inherit from 'VoiceoverScene'.
+- Use 'GTTSService'.
+- Return ONLY the corrected Python code.
 """
     else:
-        prompt = f"""You are a Manim Programmer Agent. Generate Python code using the Manim library and manim-voiceover to create a short, educational animation synchronized with the provided narration script.
+        prompt = f"""
+# CONTEXT
+You are a Manim Programmer Agent for MwalimuSmart. You create educational animations synchronized with voiceovers.
 
+# OBJECTIVE
+Generate Python code using 'manim' and 'manim-voiceover' for:
 Topic: {topic}
 Step: {step_text}
 Narration Script: {script or step_text}
 
-Requirements:
-1. Use Manim Community Edition (manim library)
-2. Use manim-voiceover for audio (VoiceoverScene, GTTSService)
-3. Create a class 'GeneratedScene' inheriting from 'VoiceoverScene'
-4. Use 'with self.voiceover(text=...) as tracker:' blocks. Use the EXACT Narration Script provided above for the voiceover text.
-5. Synchronize all visual animations inside the voiceover blocks.
-6. **Visibility Rules**: Use Green (#4CAF50) for text/labels by default. If the background/object is green, use White (#FFFFFF).
-7. Return ONLY the Python code, no explanations.
+# STYLE (CLEAR Framework)
+1. **CONCISE**: Minimal, effective visual animations per step.
+2. **LOGICAL**: Synchronize visuals inside 'with self.voiceover(...) as tracker:' blocks.
+3. **EXPLICIT**: Use EXACT Narration Script. Use Green (#4CAF50) for text unless background is green (then use White).
 
-Example structure:
+# RESPONSE FORMAT
+Return ONLY the complete Python code. No explanations.
+
+# EXAMPLE STRUCTURE
 ```python
 from manim import *
 from manim_voiceover import VoiceoverScene
@@ -69,8 +77,8 @@ from manim_voiceover.services.gtts import GTTSService
 class GeneratedScene(VoiceoverScene):
     def construct(self):
         self.set_speech_service(GTTSService())
-        with self.voiceover(text="The provided narration script goes here.") as tracker:
-            # animations here
+        with self.voiceover(text="EXACT SCRIPT HERE") as tracker:
+            # animations
 ```
 """
     

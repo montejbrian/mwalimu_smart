@@ -118,81 +118,69 @@ class Question:
 
 LEVEL_PROMPT_TEMPLATES: Dict[BloomLevel, str] = {
     BloomLevel.REMEMBER: """
-You are testing RECALL and RECOGNITION (Bloom's Level 1 — Remember).
-Questions must ask students to retrieve or identify facts, terms, or definitions directly from memory.
-Use action verbs like: {verbs}.
+# OBJECTIVE
+Test RECALL and RECOGNITION (Bloom's Level 1 — Remember).
+Questions must ask students to identify facts, terms, or definitions directly.
 
-Good example: "{example}"
-
-Rules:
-- The correct answer MUST be a fact explicitly stated in or directly derivable from the lesson.
-- Distractors must be plausible but clearly incorrect facts or definitions.
-- DO NOT ask for reasoning, inference, or application.
+# GUIDANCE
+- Use action verbs: {verbs}.
+- Good example: "{example}"
+- Rules: Correct answer must be a fact from the lesson. Distractors must be plausible but clearly incorrect.
 """,
 
     BloomLevel.UNDERSTAND: """
-You are testing COMPREHENSION (Bloom's Level 2 — Understand).
-Questions must ask students to explain or interpret concepts in their own terms.
-Use action verbs like: {verbs}.
+# OBJECTIVE
+Test COMPREHENSION (Bloom's Level 2 — Understand).
+Questions must ask students to explain or interpret concepts in their own words.
 
-Good example: "{example}"
-
-Rules:
-- Ask students to classify, explain the meaning of, or summarize lesson concepts.
-- Distractors should represent common misconceptions or faulty explanations.
-- Avoid purely factual recall questions.
+# GUIDANCE
+- Use action verbs: {verbs}.
+- Good example: "{example}"
+- Rules: Ask for classification, meaning, or summaries. Distractors should represent common misconceptions.
 """,
 
     BloomLevel.APPLY: """
-You are testing APPLICATION (Bloom's Level 3 — Apply).
-Questions must present a new scenario and ask students to use lesson knowledge to solve it.
-Use action verbs like: {verbs}.
+# OBJECTIVE
+Test APPLICATION (Bloom's Level 3 — Apply).
+Questions must present a NEW scenario and ask students to use lesson knowledge to solve it.
 
-Good example: "{example}"
-
-Rules:
-- The scenario or problem context must be NEW (not verbatim from the lesson).
-- The correct answer requires applying a principle or process from the lesson.
-- Distractors must reflect plausible but incorrect applications of the same concept.
+# GUIDANCE
+- Use action verbs: {verbs}.
+- Good example: "{example}"
+- Rules: Scenario must be new. Correct answer requires applying a process/principle.
 """,
 
     BloomLevel.ANALYZE: """
-You are testing ANALYSIS (Bloom's Level 4 — Analyze).
-Questions must ask students to break down information, find patterns, or distinguish between components.
-Use action verbs like: {verbs}.
+# OBJECTIVE
+Test ANALYSIS (Bloom's Level 4 — Analyze).
+Questions must ask students to break down information or find patterns.
 
-Good example: "{example}"
-
-Rules:
-- Questions must require COMPARING, CONTRASTING, or EXAMINING parts of a concept.
-- Avoid questions that can be answered by recall alone.
-- Distractors must be structurally similar to the correct answer but logically distinct.
+# GUIDANCE
+- Use action verbs: {verbs}.
+- Good example: "{example}"
+- Rules: Require COMPARING, CONTRASTING, or EXAMINING components.
 """,
 
     BloomLevel.EVALUATE: """
-You are testing EVALUATION (Bloom's Level 5 — Evaluate).
-Questions must ask students to judge, critique, or defend a claim or solution based on criteria.
-Use action verbs like: {verbs}.
+# OBJECTIVE
+Test EVALUATION (Bloom's Level 5 — Evaluate).
+Questions must ask students to judge or critique a claim/solution based on criteria.
 
-Good example: "{example}"
-
-Rules:
-- Present a claim, argument, or student response and ask the student to assess its validity.
-- The correct answer must require a value judgment supported by lesson content.
-- Distractors must represent plausible but flawed judgments that a student might make.
+# GUIDANCE
+- Use action verbs: {verbs}.
+- Good example: "{example}"
+- Rules: Assess validity of an argument; requires value judgment supported by content.
 """,
 
     BloomLevel.CREATE: """
-You are testing SYNTHESIS and CREATION (Bloom's Level 6 — Create).
-Questions must ask students to propose, design, or formulate something new based on lesson principles.
-Use action verbs like: {verbs}.
+# OBJECTIVE
+Test SYNTHESIS and CREATION (Bloom's Level 6 — Create).
+Questions must ask students to propose or design something new based on principles.
 
-Good example: "{example}"
-
-Rules:
-- Ask students what they WOULD DO or how they WOULD DESIGN something, given lesson principles.
-- The question should require combining multiple concepts from the lesson.
-- Distractors should represent reasonable but conceptually flawed designs or proposals.
+# GUIDANCE
+- Use action verbs: {verbs}.
+- Good example: "{example}"
+- Rules: Ask what they WOULD DO or how they WOULD DESIGN something new.
 """,
 }
 
@@ -327,56 +315,62 @@ class QuestionGenerator:
         num_questions: int,
     ) -> str:
         """
-        Build a level-specific prompt using the template for that Bloom's level.
+        Build a level-specific prompt using the CO-STAR framework and Bloom's Taxonomy.
         """
-        template = LEVEL_PROMPT_TEMPLATES[level]
-        level_guidance = template.format(
+        level_guidance = LEVEL_PROMPT_TEMPLATES[level].format(
             verbs=", ".join(level.action_verbs),
             example=level.example_question,
         )
 
         return f"""
-You are an academic assessment expert. Generate exactly {num_questions} multiple-choice question(s)
-for the topic "{topic}" at Bloom's Taxonomy Level: **{level.value}**.
+# CONTEXT
+You are an expert academic assessment tool for MwalimuSmart. You generate educationally sound multiple-choice questions aligned with Bloom's Taxonomy.
 
-COGNITIVE LEVEL GUIDANCE:
+# OBJECTIVE
+Generate exactly {num_questions} high-quality question(s) for the topic "{topic}" at the **{level.value}** cognitive level.
+
+# STYLE (CLEAR Framework)
+1. **CONCISE**: Direct questions and clear, distinct options. No fluff.
+2. **LOGICAL**: Questions must strictly adhere to the {level.value} level.
+3. **EXPLICIT**: Provide detailed explanations citing specific lesson concepts.
+
+# COGNITIVE LEVEL GUIDANCE
 {level_guidance}
 
-LESSON CONTENT:
+# LESSON CONTENT
 ---
 {lesson_content}
 ---
 
-OUTPUT FORMAT:
-Return ONLY a valid JSON object matching this schema exactly:
-
+# RESPONSE FORMAT (Strict JSON)
+Return ONLY a valid JSON object matching this schema:
 {{
   "questions": [
     {{
       "bloom_level": "{level.value}",
-      "concept": "Specific sub-concept being tested",
+      "concept": "Specific sub-concept from the lesson",
       "question": "The question text?",
       "options": {{
-        "A": "First option",
-        "B": "Second option",
-        "C": "Third option",
-        "D": "Fourth option"
+        "A": "Option 1",
+        "B": "Option 2",
+        "C": "Option 3",
+        "D": "Option 4"
       }},
       "correct_answer": "A",
-      "explanation": "Why the correct answer is correct, citing lesson concepts.",
+      "explanation": "Detailed explanation using lesson facts.",
       "distractor_explanations": {{
-        "B": "Why B is incorrect.",
-        "C": "Why C is incorrect.",
-        "D": "Why D is incorrect."
+        "B": "Why Choice B is conceptually incorrect.",
+        "C": "Why Choice C is conceptually incorrect.",
+        "D": "Why Choice D is conceptually incorrect."
       }}
     }}
   ]
 }}
 
-IMPORTANT:
-- Do NOT use "all of the above" or "none of the above" as options.
-- Each option must be distinct and non-trivially different.
-- All {num_questions} question(s) must be at the {level.value} cognitive level — no lower.
+# CRITICAL RULES
+- No "all of the above" or "none of the above".
+- DO NOT list cognitive levels lower than {level.value}.
+- Ensure the logical flow: Concept → Application → Contrast (for distractors).
 """
 
     def _generate_for_level(

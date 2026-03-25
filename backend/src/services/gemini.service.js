@@ -116,39 +116,45 @@ ${weaknesses.map(w => `- Question: ${w.questionText}\n  Correct Answer: ${w.corr
 Your goal is to RETEACH these specific areas. Do not just repeat the previous explanation. Use different analogies, break it down further, and address the specific confusion points identified above.`;
     }
 
-    const systemPrompt = `You are the Educator Agent for MwalimuSmart. Your task is to take a student's topic and break it down into a comprehensive, highly educational lesson consisting of 4 to 7 clear and logical steps. Adjust the number of steps based on the complexity of the topic.
+    const systemPrompt = `
+# CONTEXT
+You are the Educator Agent for MwalimuSmart, an AI-powered educational platform aligned with the Kenya Institute of Curriculum Development (KICD) curriculum. Your role is to transform a student's topic into a high-quality lesson.
 
+# OBJECTIVE
+Break down the student's topic into a comprehensive, highly educational lesson consisting of 4 to 7 clear and logical steps. Adjust the number of steps based on the complexity of the topic.
+
+# TARGET AUDIENCE
 Target Education Level: ${levelGuidelines[level] || levelGuidelines["senior-school"]}${contextPrompt}
 
-For each step, you must provide:
-1. A descriptive title.
-2. The core educational text (1-3 sentences).
-3. A detailed 'script' which is the exact spoken narration for this step. This script will be used to generate synchronized animations and voiceover.
+# STYLE (CLEAR Framework)
+1. **CONCISE**: Deliver direct, focused information without fluff.
+2. **LOGICAL FLOW**: Use a "Define → Explain → Contrast" or "Concept → Example → Conclusion" structure for each step.
+3. **EXPLICIT**: Use specific examples and relevant formulas (e.g., chemical equations, math formulas) to clarify concepts.
+4. **ADAPTIVE**: Tailor the depth and narration complexity strictly to the target education level.
+5. **REFLECTIVE**: Ensure each step builds on the previous one to reinforce learning.
 
-Return your response as a JSON object with this structure:
+# RESPONSE FORMAT
+Return your response as a strictly valid JSON object:
 {
   "title": "A clear, descriptive title for the overall lesson",
   "steps": [
     {
       "id": "1",
-      "text": "Core educational explanation",
-      "script": "The exact spoken narration for the Manim Programmer Agent to use.",
+      "text": "Core educational explanation (1-3 sentences). Use formulas and specific examples where possible.",
+      "script": "The exact spoken narration for this step. Engaging, teacher-like, and explanatory.",
       "duration": 5
-    },
-    { "id": "2", ... }
-    // Add up to 7 steps as needed to fully cover the topic
+    }
   ],
-  "summary": "Brief summary of the key takeaways"
+  "summary": "Short conclusion summarizing the key takeaways."
 }
 
-Guidelines:
-- Generate between 4 and 7 steps depending on what's necessary to fully explain the topic. Do not just stop at 3 if the topic is complex.
-- The 'script' should be engaging and explanatory, as if a human teacher is speaking. Break down complex ideas slowly.
-- Use simple language appropriate for school students.
-- Align with the Kenya Institute of Curriculum Development (KICD) curriculum.
-- Duration should be 5-10 seconds per step to allow for meaningful animation.
-- Focus on deep conceptual understanding.
-- IMPORTANT: Return strictly valid JSON. Do not include comments or markdown formatting in the JSON block itself.`;
+# GUIDELINES
+- Generate 4 to 7 steps as needed to fully cover the topic.
+- The 'script' should be engaging and explanatory.
+- Align with KICD standards.
+- Duration: 5-10 seconds per step.
+- IMPORTANT: No markdown formatting or comments inside the JSON.
+`;
 
 
     const parts = [
@@ -221,33 +227,38 @@ export async function generateVisualInstructions(
         "university": "Professional-grade academic illustrations, complex molecular structures, intricate flowcharts, and rigorous data visualizations."
     };
 
-    const prompt = `You are a visual instruction generator for an educational whiteboard. Given a lesson step, generate simple drawing instructions that can be rendered on an HTML canvas.
+    const prompt = `
+# CONTEXT
+You are a visual instruction generator for MwalimuSmart's educational whiteboard. You translate lesson steps into simple drawing instructions for an HTML canvas.
 
-Target Simplicity Level: ${levelVisualGuideline[level] || levelVisualGuideline["senior-school"]}
+# OBJECTIVE
+Generate a logical set of drawing instructions for Lesson Step ${stepNumber}: "${stepText}".
 
-Lesson Step ${stepNumber}: "${stepText}"
+# TARGET AUDIENCE
+Simplicity Level: ${levelVisualGuideline[level] || levelVisualGuideline["senior-school"]}
 
-Generate drawing instructions as a JSON array of objects. Each object should have:
+# STYLE (CLEAR Framework)
+1. **CONCISE**: Use minimal drawing objects to convey the core idea.
+2. **LOGICAL**: Place elements strategically on an 800x600 canvas.
+3. **EXPLICIT**: Use specific colors and clear labels. Highlight formulas and key terms.
+
+# RESPONSE FORMAT (Strict JSON)
+Generate instructions as a JSON array of objects:
 - type: "circle" | "rectangle" | "line" | "arrow" | "text" | "curve"
-- Coordinates and dimensions appropriate for a 800x600 canvas
-- color: hex color code
+- Coordinates and dimensions for an 800x600 canvas.
+- color: hex color code.
 - For text: 
   - text: content
   - fontSize: number
-  - isFormula: boolean (true if text contains chemical formulas or math equations like H2O, x^2)
-  - highlight: boolean (true if this text is a key concept that should glow)
+  - isFormula: boolean (true for H2O, x^2, etc.)
+  - highlight: boolean (true for key concepts)
 
-Guidelines:
-- For formulas, use standard text (e.g., "H2O", "x^2 + y^2"). The frontend will handle subscript/superscript rendering.
-- For state symbols in chemistry, include them (e.g., "HCl(aq)").
-- Use "highlight": true for important terms, formulas, or keywords.
-- Keep it simple and educational. Focus on diagrams, labels, and key visual elements.
-- IMPORTANT: Return strictly valid JSON. Do not include comments (// or /* */) in the response.
-
-[
-  {"type": "circle", "x": 400, "y": 300, "radius": 50, "color": "#3b82f6"},
-  {"type": "text", "x": 400, "y": 400, "text": "H2O(l)", "fontSize": 24, "color": "#333333", "isFormula": true, "highlight": true}
-]`;
+# GUIDELINES
+- Focus on diagrams, labels, and core visual elements.
+- For formulas, use standard text (e.g., "H2O").
+- Use "highlight": true for essential terms.
+- Return ONLY the JSON array.
+`;
 
     try {
         // 1. Check Cache
