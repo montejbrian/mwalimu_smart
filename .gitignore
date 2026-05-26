@@ -22,3 +22,94 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ==========================================
+# SENSITIVE DATA - NEVER COMMIT
+# ==========================================
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+.env.production.local
+.env.development.local
+.env.test.local
+.env.staging.local
+
+# API Keys and Credentials
+credentials.json
+secrets.json
+*.key
+*.pem
+*.cert
+api_keys/
+secrets/
+private/
+credentials/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+database_backups/
+
+# Cache
+cache/
+backend/cache/
+.cache/
+.pytest_cache/
+
+# Build outputs
+build/
+out/
+.next/
+
+# Manim generated content
+manim_videos/
+backend/videos/
+backend/manim-service/videos/
+
+# Generated files
+*.min.js
+*.min.css
+
+# Testing
+coverage/
+.nyc_output/
+.tmp/
+tmp/
+temp/
+
+# OS files
+Thumbs.db
+Desktop.ini
+.thumb*
+
+# IDE
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# Mac
+.AppleDouble
+.LSOverride
+
+# Parcel related
+.cache/
+dist/
+
+# Package managers
+package-lock.json
+bun.lockb
+yarn.lock
+
+# Google Cloud credentials
+google-credentials.json
+GOOGLE_APPLICATION_CREDENTIALS
+
+# System
+*.pid
+.env.test
+*.swp
+*~

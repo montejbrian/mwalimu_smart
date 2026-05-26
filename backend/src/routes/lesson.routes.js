@@ -8,16 +8,16 @@ import {
 
 const router = Router();
 
-// POST /api/generate-lesson - Generate a lesson from a question
-router.post('/generate-lesson', generateLessonController);
+// POST /api/lessons/generate - Generate a lesson using RAG
+router.post('/generate', generateLessonController);
 
-// POST /api/generate-audio - Generate audio narration for text
-router.post('/generate-audio', generateAudioController);
+// POST /api/lessons/audio - Generate audio narration
+router.post('/audio', generateAudioController);
 
-// POST /api/generate-visual - Generate visual instructions for a step
-router.post('/generate-visual', generateVisualController);
+// POST /api/lessons/visual - Generate visual content
+router.post('/visual', generateVisualController);
 
-// POST /api/generate-image - Generate AI image for a step
-router.post('/generate-image', generateImageController);
+// POST /api/lessons/image - Generate image (placeholder)
+router.post('/image', generateImageController);
 
 export default router;

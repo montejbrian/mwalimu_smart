@@ -15,6 +15,43 @@ function ensureCacheDir() {
 const getGenAI = () => new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const getModelName = () => process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
+/**
+ * Simple Semaphore to limit concurrent AI requests
+ */
+class Semaphore {
+    constructor(max) {
+        this.max = max;
+        this.count = 0;
+        this.queue = [];
+    }
+    async acquire() {
+        if (this.count < this.max) {
+            this.count++;
+            return;
+        }
+        return new Promise(resolve => this.queue.push(resolve));
+    }
+    release() {
+        this.count--;
+        if (this.queue.length > 0) {
+            this.count++;
+            const next = this.queue.shift();
+            next();
+        }
+    }
+    async run(fn) {
+        await this.acquire();
+        try {
+            return await fn();
+        } finally {
+            this.release();
+        }
+    }
+}
+
+// Ensure gemini-2.5-flash doesn't get slammed. Serialize requests (limit: 1)
+const geminiSemaphore = new Semaphore(1);
+
 
 /*Helper to retry an operation with exponential backoff*/
 async function retryOperation(
@@ -30,16 +67,23 @@ async function retryOperation(
         } catch (error) {
             lastError = error;
 
-            // For rate limit errors, use much longer delays
-            const isRateLimit = error.status === 429;
-            const effectiveDelay = isRateLimit
-                ? 15000 * Math.pow(2, i) // 15s, 30s, 60s for rate limits
-                : baseDelay * Math.pow(2, i);
-            const effectiveMaxRetries = isRateLimit ? Math.max(maxRetries, 4) : maxRetries;
+            // For rate limit (429) or high demand (503), use much longer delays
+            const isRateLimited = error.status === 429 || error.status === 503;
+            if (isRateLimited) {
+                const retryDelay = 20000 * Math.pow(2, i); // 20s, 40s, 80s, 160s
+                const maxRetriesTotal = Math.max(maxRetries, 5);
+                console.warn(`Attempt ${i + 1}/${maxRetriesTotal} failed with ${error.status} (Busy). Retrying in ${retryDelay}ms...`);
+                
+                if (i < maxRetriesTotal - 1) {
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    continue;
+                }
+            }
 
-            console.warn(`Attempt ${i + 1}/${effectiveMaxRetries} failed${isRateLimit ? ' (RATE LIMITED)' : ''}. Retrying in ${effectiveDelay}ms...`);
+            const effectiveDelay = baseDelay * Math.pow(2, i);
+            console.warn(`Attempt ${i + 1}/${maxRetries} failed: ${error.message}. Retrying in ${effectiveDelay}ms...`);
 
-            if (i < effectiveMaxRetries - 1) {
+            if (i < maxRetries - 1) {
                 await new Promise(resolve => setTimeout(resolve, effectiveDelay));
             } else {
                 break;
@@ -47,10 +91,11 @@ async function retryOperation(
         }
     }
 
-    // Provide a clearer error message for rate limits
-    if (lastError?.status === 429) {
-        const err = new Error('Gemini API rate limit exceeded. Please wait a minute and try again.');
-        err.status = 429;
+    // Provide a clearer error message for rate limits or high demand
+    if (lastError?.status === 429 || lastError?.status === 503) {
+        const errorType = lastError.status === 429 ? 'Rate limit exceeded' : 'AI service high demand (503)';
+        const err = new Error(`Gemini ${errorType}. Please try again in a minute.`);
+        err.status = lastError.status;
         throw err;
     }
 
@@ -61,8 +106,11 @@ async function retryOperation(
  * Validates the model name and provides feedback if it's likely incorrect.
  */
 async function validateModel(modelName) {
-    if (modelName === 'gemini-2.5-flash') {
-        console.warn("\n[SYSTEM WARNING] Model 'gemini-2.5-flash' is requested. If you see 404/400 errors, this version might not be available in your region yet. Consider 'gemini-1.5-flash' for stability.\n");
+    if (modelName.includes('2.5')) {
+        // Reduced noise as user specifically requested this model
+        console.log(`[AI] Active model: ${modelName} (Experimental Mode)`);
+    } else {
+        console.log(`[AI] Using model: ${modelName}`);
     }
 }
 
@@ -96,8 +144,11 @@ export async function generateLesson(
     level = "senior-school",
     weaknesses = null
 ) {
+    const modelName = getModelName();
+    await validateModel(modelName);
+
     const model = getGenAI().getGenerativeModel({
-        model: getModelName()
+        model: modelName
     });
 
     const levelGuidelines = {
@@ -173,24 +224,28 @@ Return your response as a strictly valid JSON object:
     }
 
     try {
-        const result = await retryOperation(() => model.generateContent(parts));
-        const response = result.response;
-        const text = response.text();
+        const result = await geminiSemaphore.run(() => 
+            retryOperation(() => model.generateContent(parts))
+        );
+        if (!result || !result.response) throw new Error('Empty response from AI');
+        const text = result.response.text();
 
         const cleanedText = cleanJsonString(text);
         const lessonData = JSON.parse(cleanedText);
         return lessonData;
     } catch (error) {
-        if (error.status === 429) throw error;
-        console.error('Failed to parse Gemini response for Lesson:', error);
-        throw new Error('Failed to parse lesson data from AI response');
+        if (error.status === 429 || error.status === 503) throw error;
+        console.error('Lesson Generation Error:', error);
+        throw new Error('Lesson generation failed. Please try again.');
     }
 }
 
 /*Generate audio narration for a given text using Google Cloud Text-to-Speech*/
 export async function generateAudioNarration(text) {
     try {
-        const audioBase64 = await retryOperation(() => generateAudio(text));
+        const audioBase64 = await geminiSemaphore.run(() => 
+            retryOperation(() => generateAudio(text))
+        );
         return {
             text,
             audioBase64,
@@ -215,8 +270,11 @@ export async function generateVisualInstructions(
     level = "senior-school"
 ) {
 
+    const modelName = getModelName();
+    await validateModel(modelName);
+
     const model = getGenAI().getGenerativeModel({
-        model: getModelName()
+        model: modelName
     });
 
     const levelVisualGuideline = {
@@ -249,23 +307,28 @@ Generate a logical set of drawing instructions for Lesson Step ${stepNumber}: "$
 2. **LOGICAL**: Group related items visually. Create structured diagrams rather than isolated shapes.
 3. **EXPLICIT**: Use specific colors. Highlight formulas and key terms using "highlight": true.
 
-# RESPONSE FORMAT (Strict JSON)
+# RESPONSE FORMAT (Strict JSON Array)
 Generate a JSON array of objects:
 - type: "circle" | "rectangle" | "line" | "arrow" | "text" | "curve"
 - Coordinates (x, y) and dimensions for an 800x600 canvas.
-- color: hex color code (e.g., #4CAF50).
+- color: hex color code (e.g., #4CAF50). Use diverse colors.
+- lineWidth: number (1-8, default 3). Use thicker lines for outlines.
+- shadowBlur: number (0-15). Use for depth.
+- filled: boolean.
 - For text: 
   - text: content
-  - fontSize: number (e.g., 20)
+  - fontSize: number (e.g., 20 or 25 for titles)
   - isFormula: boolean
   - highlight: boolean
 
-# GUIDELINES
-- **RICHNESS**: Aim for 5-10+ visual objects per step to create a comprehensive illustration.
-- **CONTEXT**: Include surrounding elements (e.g., if drawing a cell, draw the nucleus, mitochondria, and cell wall with labels).
-- **CLARITY**: Ensure all important terms in the text have a corresponding visual or label.
-- **DEPTH**: Use different colors and shapes to distinguish parts of a system.
-- Return ONLY the JSON array.
+# MASTER ILLUSTRATOR REQUIREMENTS
+1. **COMPREHENSIVE**: Aim for **10-15+ objects**. Draw a full scene, not just a standalone shape.
+2. **LABELED**: Every important part of the drawing MUST have a 'text' label pointing to it.
+3. **COLORFUL**: Use a professional palette (e.g., #4CAF50, #3b82f6, #ef4444, #8b5cf6).
+4. **SPATIAL**: Spread out the drawing across the 800x600 space. Do not cluster everything in the center.
+5. **ORGANIC**: Use 'curve' for anatomy, nature, or flow.
+6. **ILLUSTRATIVE**: If the topic is 'Heart', draw the chambers, valves, and blood flow paths with arrows.
+7. Return ONLY the JSON array.
 `;
 
     try {
@@ -282,7 +345,9 @@ Generate a JSON array of objects:
 
         console.log(`Visual cache miss for step ${stepNumber}. Generating...`);
         ensureCacheDir();
-        const result = await retryOperation(() => model.generateContent(prompt));
+        const result = await geminiSemaphore.run(() => 
+            retryOperation(() => model.generateContent(prompt))
+        );
         const response = result.response;
         const text = response.text();
 

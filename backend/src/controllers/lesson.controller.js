@@ -10,11 +10,13 @@ export async function generateLessonController(req, res) {
             return res.status(400).json({ error: 'Question is required and must be a string' });
         }
 
-        console.log(`Generating lesson for question: "${question}" with image: ${image ? 'yes' : 'no'} and level: ${level}`);
+        console.log(`[AI] Starting lesson generation for: "${question}"`);
+        const startTime = Date.now();
 
         const lessonData = await generateLesson(question, image, level);
+        const duration = Date.now() - startTime;
         
-        console.log(`Generated lesson: "${lessonData.title}" with ${lessonData.steps.length} steps and scripts.`);
+        console.log(`[SUCCESS] Generated lesson in ${duration}ms with ${lessonData.steps.length} steps.`);
         return res.json(lessonData);
     } catch (error) {
         console.error('Error generating lesson:', error);
@@ -77,12 +79,13 @@ export async function generateVisualController(req, res) {
                 } else {
                     // Video not ready, trigger background generation and return canvas fallback immediately
                     console.log(`Manim cache miss for step ${stepNumber}. Triggering background render and returning canvas fallback.`);
+                    
                     generateManimAnimation(stepText, stepNumber, topic, script).catch(e => console.error(`Bg Manim Error: ${e.message}`));
                     
                     const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script, level);
                     return res.json({ 
                         instructions,
-                        videoStatus: 'rendering' // Optional hint for frontend
+                        videoStatus: 'rendering'
                     });
                 }
             } catch (manimError) {
