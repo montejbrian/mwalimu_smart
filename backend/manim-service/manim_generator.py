@@ -4,52 +4,47 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import subprocess
 import tempfile
+from typing import Optional
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 # Gemini AI
-genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), 'videos')
 os.makedirs(VIDEO_DIR, exist_ok=True)
 
-from typing import Optional
-
-def generate_manim_code(step_text: str, topic: str, script: Optional[str] = None, error_log: str = "", previous_code: str = "") -> str:
-    """Manim Programmer Agent: Generates Manim code, potentially correcting previous errors."""
+def generate_manim_code(step_text: str, topic: str, script: Optional[str] = None, error_log: str = "", previous_code: str = "", bg_image_path: Optional[str] = None) -> str:
+    """Manim Programmer Agent: Generates Manim code using Gemini."""
     
     model_name = os.getenv('GEMINI_MODEL', 'gemini-1.5-flash')
-    if model_name == 'gemini-2.5-flash':
-        print(f"\n[SYSTEM WARNING] Model '{model_name}' is requested. If this fails, consider 'gemini-1.5-flash'.\n")
-    model = genai.GenerativeModel(model_name) # Using configurable model
+    model = genai.GenerativeModel(model_name)
     
     if error_log and previous_code:
         prompt = f"""
-# CONTEXT
-You are a Manim Programmer Agent for MwalimuSmart. Your previous attempt to generate code failed.
+# DEBUGGING MODE
+You generated Manim code that failed. Fix it.
+ERROR: {error_log}
 
-# OBJECTIVE
-FIX the Manim code for the topic "{topic}" based on the error log provided.
-
-# STYLE (CLEAR Framework)
-1. **CONCISE**: Fix ONLY the necessary parts.
-2. **LOGICAL**: Ensure a valid 'GeneratedScene' class structure.
-3. **EXPLICIT**: Use EXACT narration scripts in 'voiceover' blocks.
-
-# PREVIOUS ATTEMPT
-```python
+PREVIOUS CODE:
 {previous_code}
-```
 
-# ERROR LOG
-{error_log}
-
-# REQUIREMENTS
-- Inherit from 'VoiceoverScene'.
-- Use 'GTTSService'.
+- Ensure the code is complete, valid, and fixes the error above.
 - Return ONLY the corrected Python code.
 """
     else:
+        bg_instruction = ""
+        if bg_image_path:
+            bg_instruction = f"""
+# BACKGROUND IMAGE
+A background image is available at: '{bg_image_path}'.
+You MUST load this image using `ImageMobject('{bg_image_path}')` and scale it to fit the screen.
+Place your animations ON TOP of this image. Use it as a reference for your labels and arrows.
+Example: 
+bg = ImageMobject('{bg_image_path}').scale_to_fit_width(config.frame_width)
+self.add(bg)
+"""
+
         prompt = f"""
 # CONTEXT
 You are a Manim Programmer Agent for MwalimuSmart. You create educational animations synchronized with voiceovers.
@@ -59,6 +54,8 @@ Generate Python code using 'manim' and 'manim-voiceover' for:
 Topic: {topic}
 Step: {step_text}
 Narration Script: {script or step_text}
+
+{bg_instruction}
 
 # VISUAL ARRANGEMENT
 1. **NO OVERLAP**: Geometric shapes, text, and labels MUST NOT overlap.
@@ -116,11 +113,11 @@ class GeneratedScene(VoiceoverScene):
     
     return code.strip()
 
-def generate_animation(step_text: str, step_number: int, topic: str, script: Optional[str] = None) -> str:
+def generate_animation(step_text: str, step_number: int, topic: str, script: Optional[str] = None, bg_image_path: Optional[str] = None) -> str:
     """Generate Manim animation with a self-correction loop."""
     
     # Create cache key
-    cache_key = hashlib.md5(f"{topic}:{step_text}:{script}".encode()).hexdigest()
+    cache_key = hashlib.md5(f"{topic}:{step_text}:{script}:{bg_image_path}".encode()).hexdigest()
     video_filename = f"animation_{cache_key}.mp4"
     video_path = os.path.join(VIDEO_DIR, video_filename)
     
@@ -136,7 +133,7 @@ def generate_animation(step_text: str, step_number: int, topic: str, script: Opt
     for attempt in range(max_attempts):
         try:
             print(f"Attempt {attempt + 1}: Generating Manim code...")
-            manim_code: str = generate_manim_code(step_text, topic, script, error_log, previous_code)
+            manim_code: str = generate_manim_code(step_text, topic, script, error_log, previous_code, bg_image_path)
             previous_code = manim_code
             
             # Create temporary Python file
@@ -189,4 +186,3 @@ def generate_animation(step_text: str, step_number: int, topic: str, script: Opt
             error_log = str(e)
             
     raise Exception(f"Failed to generate animation after {max_attempts} attempts. Last error: {error_log}")
-

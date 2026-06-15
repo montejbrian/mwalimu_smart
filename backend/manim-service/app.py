@@ -46,13 +46,35 @@ def generate_animation_endpoint():
         step_number = data.get('stepNumber', 1)
         topic = data.get('topic', 'general')
         script = data.get('script') # Educator's script
+        image_base64 = data.get('image_base64') # Optional background image
         
         if not step_text:
             return jsonify({'error': 'stepText is required'}), 400
-        
-        # Generate animation (now takes script)
-        video_path = generate_animation(step_text, step_number, topic, script)
 
+        # Save image to temp file if provided
+        bg_image_path = None
+        if image_base64:
+            try:
+                import base64
+                import tempfile
+                
+                header, encoded = image_base64.split(",", 1) if "," in image_base64 else (None, image_base64)
+                img_data = base64.b64decode(encoded)
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as f:
+                    f.write(img_data)
+                    bg_image_path = f.name
+                print(f"Saved background image to: {bg_image_path}")
+            except Exception as e:
+                print(f"Error decoding/saving background image: {e}")
+        
+        # Generate animation (now takes script and optional background image)
+        video_path = generate_animation(step_text, step_number, topic, script, bg_image_path)
+        
+        # Cleanup bg image
+        if bg_image_path and os.path.exists(bg_image_path):
+            try: os.unlink(bg_image_path)
+            except: pass
         
         if not video_path or not os.path.exists(video_path):
             return jsonify({'error': 'Failed to generate animation'}), 500

@@ -208,7 +208,9 @@ Return your response as a strictly valid JSON object:
       "id": "1",
       "text": "Core educational explanation (1-3 sentences). Use formulas and specific examples where possible.",
       "script": "The exact spoken narration for this step. Engaging, teacher-like, and explanatory.",
-      "duration": 5
+      "duration": 5,
+      "visualMode": "realistic_motion" | "technical_animation" | "procedural_drawing",
+      "visualPrompt": "Detailed instructions for the visual layer. If 'realistic_motion', describe the background scene for Stable Diffusion AND the specific overlays for Manim (e.g., 'Background: A realistic human heart. Manim: Draw blue arrows showing blood flow through the vena cava'). If 'technical_animation', describe the Manim math animation. If 'procedural_drawing', provide drawing context."
     }
   ],
   "summary": "Short conclusion summarizing the key takeaways."
@@ -217,6 +219,10 @@ Return your response as a strictly valid JSON object:
 # GUIDELINES
 - Generate 4 to 7 steps as needed to fully cover the topic.
 - The 'script' should be engaging and explanatory.
+- **VISUAL MODES**:
+    - **realistic_motion**: Use for complex biological, chemical, or physical structures where a real-world photo background + animated annotations (arrows, labels) is best.
+    - **technical_animation**: Use for pure math, physics formulas, or abstract concepts that require clean Manim graphs and transitions.
+    - **procedural_drawing**: Use for very simple diagrams or when the concept is mostly text-based.
 - Align with KICD standards.
 - Duration: 5-10 seconds per step.
 - IMPORTANT: No markdown formatting or comments inside the JSON.

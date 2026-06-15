@@ -139,7 +139,7 @@ export async function generateAudioController(req, res) {
 /*Generate visual instructions for a step*/
 export async function generateVisualController(req, res) {
     try {
-        const { stepText, stepNumber, topic, script, level } = req.body;
+        const { stepText, stepNumber, topic, script, level, visualMode, visualPrompt } = req.body;
 
         if (!stepText || typeof stepText !== 'string') {
             return res.status(400).json({ error: 'stepText is required and must be a string' });
@@ -149,46 +149,63 @@ export async function generateVisualController(req, res) {
             return res.status(400).json({ error: 'stepNumber is required and must be a number' });
         }
 
-        // Determine if we should use Manim or Canvas
-        const manimTopics = ['math', 'physics', 'geometry', 'theorem', 'equation', 'pythagorean'];
-        const isManim = manimTopics.some(t => topic.toLowerCase().includes(t));
-
-        if (isManim) {
+        // --- HYBRID VISUAL STRATEGY ---
+        
+        // 1. Realistic Motion: SD Background + Manim Overlay
+        if (visualMode === 'realistic_motion') {
             try {
-                const { generateManimAnimation, checkManimCache } = await import('../services/manim.service.js');
+                console.log(`[HYBRID] Starting realistic_motion for step ${stepNumber}: ${topic}`);
                 
-                // 1. Check if Manim is already cached
-                const isCached = await checkManimCache(stepText, topic, script);
+                // A. Generate Realistic Background via Stable Diffusion
+                // We use the visualPrompt or a derived prompt for SD
+                const sdResult = await generateEducationalImage(topic, visualPrompt || stepText);
                 
-                if (isCached) {
-                    // Video is ready, return it immediately
-                    const manimResult = await generateManimAnimation(stepText, stepNumber, topic, script);
-                    return res.json({
-                        isVideo: true,
-                        videoBase64: manimResult.videoBase64
-                    });
-                } else {
-                    // Video not ready, trigger background generation and return canvas fallback immediately
-                    console.log(`Manim cache miss for step ${stepNumber}. Triggering background render and returning canvas fallback.`);
-                    
-                    generateManimAnimation(stepText, stepNumber, topic, script).catch(e => console.error(`Bg Manim Error: ${e.message}`));
-                    
-                    const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script, level);
-                    return res.json({ 
-                        instructions,
-                        videoStatus: 'rendering'
-                    });
+                let imageBase64 = null;
+                if (sdResult.useAI && sdResult.imageBase64) {
+                    imageBase64 = `data:image/png;base64,${sdResult.imageBase64}`;
+                    console.log(`[HYBRID] SD Background generated for step ${stepNumber}`);
                 }
-            } catch (manimError) {
-                console.warn('Manim logic failed, falling back to canvas instructions:', manimError.message);
+
+                // B. Call Manim Service with the SD image
+                const { generateManimAnimation } = await import('../services/manim.service.js');
+                const manimResult = await generateManimAnimation(stepText, stepNumber, topic, script, imageBase64);
+
+                return res.json({
+                    isVideo: true,
+                    videoBase64: manimResult.videoBase64,
+                    visualMode: 'realistic_motion'
+                });
+
+            } catch (hybridError) {
+                console.warn(`[HYBRID FAIL] Realistic motion failed, falling back to canvas:`, hybridError.message);
                 const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script, level);
-                return res.json({ instructions });
+                return res.json({ instructions, visualMode: 'procedural_drawing' });
             }
-        } else {
-            const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script, level);
-            return res.json({ instructions });
         }
 
+        // 2. Technical Animation: Pure Manim
+        if (visualMode === 'technical_animation') {
+            try {
+                const { generateManimAnimation } = await import('../services/manim.service.js');
+                const manimResult = await generateManimAnimation(stepText, stepNumber, topic, script);
+                return res.json({
+                    isVideo: true,
+                    videoBase64: manimResult.videoBase64,
+                    visualMode: 'technical_animation'
+                });
+            } catch (manimError) {
+                console.warn(`[MANIM FAIL] Technical animation failed, falling back to canvas:`, manimError.message);
+                const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script, level);
+                return res.json({ instructions, visualMode: 'procedural_drawing' });
+            }
+        }
+
+        // 3. Procedural Drawing (Default Fallback)
+        const instructions = await generateVisualInstructions(stepText, stepNumber, topic, script, level);
+        return res.json({ 
+            instructions, 
+            visualMode: visualMode || 'procedural_drawing' 
+        });
 
     } catch (error) {
         console.error('Error generating visual instructions:', error);

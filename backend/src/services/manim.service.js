@@ -8,16 +8,18 @@ const MANIM_SERVICE_URL = process.env.MANIM_SERVICE_URL || 'http://localhost:500
  * @param {number} stepNumber The chronological step number.
  * @param {string} topic The overarching topic (e.g., 'Pythagorean Theorem').
  * @param {string} script The expanded educator script for the step.
+ * @param {string} image_base64 Optional background image.
  * @returns {Promise<string>} Base64 encoded video data.
  */
-export async function generateManimAnimation(stepText, stepNumber, topic, script) {
+export async function generateManimAnimation(stepText, stepNumber, topic, script, image_base64 = null) {
     try {
         console.log(`Requesting Manim animation for topic: "${topic}", step: ${stepNumber}`);
         const response = await axios.post(`${MANIM_SERVICE_URL}/generate-animation`, {
             stepText,
             stepNumber,
             topic,
-            script
+            script,
+            image_base64
         }, {
             timeout: 120000 // Manim rendering can take up to 2 minutes
         });
