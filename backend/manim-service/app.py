@@ -10,7 +10,8 @@ from flask import Flask, request, jsonify, send_file  # pyre-ignore[21]
 from flask_cors import CORS  # pyre-ignore[21]
 from dotenv import load_dotenv  # pyre-ignore[21]
 
-load_dotenv()
+load_dotenv()  # Look in current dir
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env')) # Look in backend dir
 
 app = Flask(__name__)
 CORS(app)  # type: ignore

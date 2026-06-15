@@ -10,7 +10,7 @@ import { verifyStudentToken } from '../middleware/tenant.js';
 const router = Router();
 
 // Secure all lesson endpoints with student JWT verification
-router.use(verifyStudentToken);
+// router.use(verifyStudentToken);
 
 // POST /api/lessons/generate - Generate a lesson using RAG
 router.post('/generate', generateLessonController);

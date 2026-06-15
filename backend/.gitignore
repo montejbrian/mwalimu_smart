@@ -53,4 +53,5 @@ coverage/
 .env.test
 tmp/
 temp/
+gen-lang-client-0498527238-536ef05a2e66.json
 

@@ -8,20 +8,11 @@ import json
 import logging
 import time
 import re
+import os
+import google.generativeai as genai
 from enum import Enum
-from typing import List, Dict, Any, Optional, TYPE_CHECKING
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
-
-if TYPE_CHECKING:
-    from openai import OpenAI, APIError, RateLimitError
-else:
-    try:
-        from openai import OpenAI, APIError, RateLimitError
-    except ImportError:
-        OpenAI = object
-        APIError = Exception
-        RateLimitError = Exception
-
 
 # ---------------------------------------------------------------------------
 # BloomLevel Enum
@@ -192,49 +183,21 @@ Questions must ask students to propose or design something new based on principl
 class QuestionGenerator:
     """
     Generates educationally sound multiple-choice questions from lesson content,
-    categorized by Bloom's Taxonomy levels.
-
-    Supports:
-    - Per-level prompt engineering (LEVEL_PROMPT_TEMPLATES)
-    - Difficulty weighting (BloomLevel.difficulty_weight)
-    - Distribution control (how many questions per cognitive level)
-    - Question deduplication and structural validation
+    categorized by Bloom's Taxonomy levels using Google Gemini.
     """
 
-    DEFAULT_DISTRIBUTION: Dict[BloomLevel, int] = {
-        BloomLevel.REMEMBER:   1,
-        BloomLevel.UNDERSTAND: 1,
-        BloomLevel.APPLY:      1,
-        BloomLevel.ANALYZE:    1,
-        BloomLevel.EVALUATE:   1,
-    }
-
-    def __init__(self, api_key: str, model: str = "gpt-4o") -> None:
+    def __init__(self, api_key: str, model: str = "gemini-1.5-flash") -> None:
         """
-        Initialize the generator with an OpenAI API key.
-
-        Args:
-            api_key: OpenAI API key.
-            model: OpenAI model to use (default: gpt-4o).
+        Initialize the generator with a Gemini API key.
         """
         if not api_key:
             raise ValueError("API key is required for QuestionGenerator.")
 
-        try:
-            self.client = OpenAI(api_key=api_key)  # type: ignore
-        except Exception:
-            raise ImportError(
-                "OpenAI library not installed. Run: pip install openai"
-            )
-
-        self.model = model
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel(model)
         self.logger = logging.getLogger(__name__)
         if not self.logger.handlers:
             logging.basicConfig(level=logging.INFO)
-
-    # -----------------------------------------------------------------------
-    # Public API
-    # -----------------------------------------------------------------------
 
     def generate_questions(
         self,
@@ -243,20 +206,6 @@ class QuestionGenerator:
         count: int = 5,
         distribution: Optional[Dict[BloomLevel, int]] = None,
     ) -> List[Question]:
-        """
-        Generate Bloom's Taxonomy–categorized multiple-choice questions.
-
-        Args:
-            lesson_content: The lesson text or transcript to base questions on.
-            topic: The main subject/topic of the lesson.
-            count: Total number of questions (used if distribution is None).
-            distribution: Optional dict mapping BloomLevel → question count.
-                          If provided, overrides `count`.
-                          Example: {BloomLevel.REMEMBER: 2, BloomLevel.APPLY: 3}
-
-        Returns:
-            List of validated Question objects.
-        """
         resolved = self._resolve_distribution(count, distribution)
         all_questions: List[Question] = []
         seen_texts: set = set()
@@ -266,12 +215,8 @@ class QuestionGenerator:
             if level_count <= 0:
                 continue
 
-            self.logger.info(
-                f"Generating {level_count} question(s) at level: {level.value}"
-            )
-            questions = self._generate_for_level(
-                lesson_content, topic, level, level_count
-            )
+            self.logger.info(f"Generating {level_count} question(s) at level: {level.value}")
+            questions = self._generate_for_level(lesson_content, topic, level, level_count)
 
             for q in questions:
                 norm = re.sub(r"\W+", "", q.question.lower())
@@ -284,39 +229,16 @@ class QuestionGenerator:
 
         return all_questions
 
-    # -----------------------------------------------------------------------
-    # Internal helpers
-    # -----------------------------------------------------------------------
-
-    def _resolve_distribution(
-        self,
-        count: int,
-        distribution: Optional[Dict[BloomLevel, int]],
-    ) -> Dict[BloomLevel, int]:
-        """
-        Resolve the final per-level question distribution.
-        Falls back to even spread if distribution is None.
-        """
+    def _resolve_distribution(self, count: int, distribution: Optional[Dict[BloomLevel, int]]) -> Dict[BloomLevel, int]:
         if distribution:
             return distribution
-
-        # Spread `count` questions across levels, lower levels first
-        levels = list(BloomLevel)  # type: ignore[arg-type]
+        levels = list(BloomLevel)
         result: Dict[BloomLevel, int] = {lv: 0 for lv in levels}
         for i in range(count):
             result[levels[i % len(levels)]] += 1
         return result
 
-    def _build_level_prompt(
-        self,
-        lesson_content: str,
-        topic: str,
-        level: BloomLevel,
-        num_questions: int,
-    ) -> str:
-        """
-        Build a level-specific prompt using the CO-STAR framework and Bloom's Taxonomy.
-        """
+    def _build_level_prompt(self, lesson_content: str, topic: str, level: BloomLevel, num_questions: int) -> str:
         level_guidance = LEVEL_PROMPT_TEMPLATES[level].format(
             verbs=", ".join(level.action_verbs),
             example=level.example_question,
@@ -373,86 +295,48 @@ Return ONLY a valid JSON object matching this schema:
 - Ensure the logical flow: Concept → Application → Contrast (for distractors).
 """
 
-    def _generate_for_level(
-        self,
-        lesson_content: str,
-        topic: str,
-        level: BloomLevel,
-        num_questions: int,
-    ) -> List[Question]:
-        """
-        Call the OpenAI API with a level-specific prompt and parse the result.
-        Returns a validated list of Question objects.
-        """
+    def _generate_for_level(self, lesson_content: str, topic: str, level: BloomLevel, num_questions: int) -> List[Question]:
         prompt = self._build_level_prompt(lesson_content, topic, level, num_questions)
         max_retries = 3
-        delay: float = 2.0
-
+        
         for attempt in range(max_retries):
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are a professional educational assessment tool. "
-                                "Always respond with valid JSON only."
-                            ),
-                        },
-                        {"role": "user", "content": prompt},
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=0.7,
+                response = self.model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        response_mime_type="application/json",
+                    )
                 )
 
-                content = response.choices[0].message.content or ""
+                content = response.text
                 data = json.loads(content)
                 raw_questions = data.get("questions", [])
                 return self._validate_and_build(raw_questions, level)
 
-            except (RateLimitError, APIError) as e:  # type: ignore[misc]
-                self.logger.warning(f"API issue (attempt {attempt + 1}): {e}")
-                if attempt < max_retries - 1:
-                    time.sleep(delay)
-                    delay = float(delay * 2.0)
-            except json.JSONDecodeError as e:
-                self.logger.error(f"JSON parse error on attempt {attempt + 1}: {e}")
             except Exception as e:
-                self.logger.error(f"Unexpected error: {e}")
-                break
+                self.logger.error(f"Error on attempt {attempt + 1}: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                else:
+                    break
 
         return []
 
-    def _validate_and_build(
-        self,
-        raw_questions: List[Dict[str, Any]],
-        level: BloomLevel,
-    ) -> List[Question]:
-        """
-        Validate raw question dicts from the LLM and convert to Question objects.
-        """
+    def _validate_and_build(self, raw_questions: List[Dict[str, Any]], level: BloomLevel) -> List[Question]:
         valid: List[Question] = []
         required_keys = {"question", "options", "correct_answer", "explanation"}
 
         for idx, q in enumerate(raw_questions):
             try:
                 if not required_keys.issubset(q.keys()):
-                    self.logger.warning(f"Skipping question {idx}: missing required keys.")
                     continue
 
                 options: Dict[str, str] = q.get("options", {})
                 if not isinstance(options, dict) or len(options) != 4:
-                    self.logger.warning(f"Skipping question {idx}: must have exactly 4 options.")
                     continue
 
                 correct = q.get("correct_answer", "")
                 if correct not in options:
-                    self.logger.warning(f"Skipping question {idx}: correct_answer not in options.")
-                    continue
-
-                if any(not str(v).strip() for v in options.values()):
-                    self.logger.warning(f"Skipping question {idx}: has empty option(s).")
                     continue
 
                 valid.append(Question(
@@ -472,23 +356,14 @@ Return ONLY a valid JSON object matching this schema:
 
         return valid
 
-    def validate_questions(
-        self, questions: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """
-        Legacy public validator for raw question dicts.
-        Compatible with the original API used by app.py.
-        """
+    def validate_questions(self, questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         validated: List[Question] = []
         seen: set = set()
 
         for q in questions:
             try:
                 level_value = q.get("bloom_level", "Remember")
-                level = next(
-                    (lv for lv in BloomLevel if lv.value == level_value),
-                    BloomLevel.REMEMBER
-                )
+                level = next((lv for lv in BloomLevel if lv.value == level_value), BloomLevel.REMEMBER)
                 built = self._validate_and_build([q], level)
                 for item in built:
                     norm = re.sub(r"\W+", "", item.question.lower())

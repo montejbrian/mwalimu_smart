@@ -114,41 +114,25 @@ Features, architecture, and modules are being iteratively built and refined.
 
 ## Setup Instructions
 
-### 1. Backend Setup
+For a complete guide to setting up the prototype with animations and audio, please see **[PROTOTYPE_GUIDE.md](./PROTOTYPE_GUIDE.md)**.
 
-```bash
-cd backend
+### Quick Start
 
-# Create .env file from the example
-cp .env.example .env
+1. **Backend**: 
+   - `cd backend`
+   - `cp .env.example .env` (add your keys)
+   - `npm install`
+   - `npm run dev`
 
-# Edit .env and add your Gemini API key
-# GEMINI_API_KEY=your_actual_api_key_here
-# PORT=3001
-# FRONTEND_URL=http://localhost:5173
+2. **Manim Service**:
+   - `cd backend/manim-service`
+   - `pip install -r requirements.txt`
+   - `python app.py`
 
-# Dependencies are already installed
-# If needed, run: npm install
-
-# Start the backend server
-npm run dev
-```
-
-The backend server will start on `http://localhost:3001`
-
-### 2. Frontend Setup
-
-```bash
-cd mvp-builder
-
-# Dependencies are already installed
-# If needed, run: npm install
-
-# Start the frontend development server
-npm run dev
-```
-
-The frontend will start on `http://localhost:5173`
+3. **Frontend**:
+   - `cd frontend`
+   - `npm install`
+   - `npm run dev`
 
 ## Usage
 

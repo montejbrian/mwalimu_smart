@@ -18,7 +18,7 @@ from typing import Optional
 def generate_manim_code(step_text: str, topic: str, script: Optional[str] = None, error_log: str = "", previous_code: str = "") -> str:
     """Manim Programmer Agent: Generates Manim code, potentially correcting previous errors."""
     
-    model_name = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
+    model_name = os.getenv('GEMINI_MODEL', 'gemini-1.5-flash')
     if model_name == 'gemini-2.5-flash':
         print(f"\n[SYSTEM WARNING] Model '{model_name}' is requested. If this fails, consider 'gemini-1.5-flash'.\n")
     model = genai.GenerativeModel(model_name) # Using configurable model

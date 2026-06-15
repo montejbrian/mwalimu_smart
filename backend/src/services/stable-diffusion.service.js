@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-const HF_API_URL = 'https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1';
+const HF_API_URL = 'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell';
 const HF_API_KEY = process.env.HUGGINGFACE_API_KEY || '';
 
 /**
@@ -83,7 +83,8 @@ export async function generateEducationalImage(
                     {
                         headers: {
                             'Authorization': `Bearer ${HF_API_KEY}`,
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'Accept': 'image/png'
                         },
                         responseType: 'arraybuffer',
                         timeout: 60000 // Increased timeout for v2-1
