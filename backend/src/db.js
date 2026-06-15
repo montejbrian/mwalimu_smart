@@ -66,7 +66,8 @@ export const initializeDatabase = async () => {
                 topic_node VARCHAR(255),
                 content_text TEXT,
                 embedding_vector vector(1536),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
 
@@ -102,6 +103,17 @@ export const initializeDatabase = async () => {
                 completion_status VARCHAR(50),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        // Create lesson_videos table for synchronized Manim sequence tracking
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS lesson_videos (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                cache_id UUID NOT NULL REFERENCES lessons_cache(id) ON DELETE CASCADE,
+                video_url TEXT NOT NULL,
+                trigger_timestamp INTEGER NOT NULL, -- exact second during playback when this video plays
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
 

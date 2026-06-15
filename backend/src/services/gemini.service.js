@@ -142,7 +142,8 @@ export async function generateLesson(
     question,
     imageBase64,
     level = "senior-school",
-    weaknesses = null
+    weaknesses = null,
+    ragContext = ""
 ) {
     const modelName = getModelName();
     await validateModel(modelName);
@@ -167,9 +168,23 @@ ${weaknesses.map(w => `- Question: ${w.questionText}\n  Correct Answer: ${w.corr
 Your goal is to RETEACH these specific areas. Do not just repeat the previous explanation. Use different analogies, break it down further, and address the specific confusion points identified above.`;
     }
 
+    let ragPrompt = "";
+    if (ragContext) {
+        ragPrompt = `
+# CRITICAL CURRICULUM CONTEXT (KICD Textbook Excerpts)
+You MUST ONLY teach and explain using the concepts, terms, and facts provided in this context. DO NOT hallucinate, do not use generic external training knowledge, and do not make up equations or structures that aren't grounded in this textbook source:
+
+---
+${ragContext}
+---
+`;
+    }
+
     const systemPrompt = `
 # CONTEXT
 You are the Educator Agent for MwalimuSmart, an AI-powered educational platform aligned with the Kenya Institute of Curriculum Development (KICD) curriculum. Your role is to transform a student's topic into a high-quality lesson.
+
+${ragPrompt}
 
 # OBJECTIVE
 Break down the student's topic into a comprehensive, highly educational lesson consisting of 4 to 7 clear and logical steps. Adjust the number of steps based on the complexity of the topic.

@@ -11,9 +11,18 @@ const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 async function getEmbedding(text) {
     try {
         // In production, use proper embedding API
-        // For now, we'll create a hash-based pseudo-embedding
+        // For now, we'll create a hash-based pseudo-embedding of 1536 dimensions
         const hash = crypto.createHash('sha256').update(text).digest();
-        const embedding = Array.from(hash).slice(0, 1536).map(b => (b - 128) / 128);
+        let seed = 0;
+        for (let i = 0; i < 4; i++) {
+            seed = (seed << 8) + hash[i];
+        }
+        
+        const embedding = [];
+        for (let i = 0; i < 1536; i++) {
+            seed = (1103515245 * seed + 12345) % 2147483648;
+            embedding.push(seed / 2147483648 * 2 - 1);
+        }
         return embedding;
     } catch (error) {
         console.error('Embedding generation error:', error);
@@ -213,7 +222,7 @@ export const cacheLessonContent = async (schoolId, topicHash, gradeLevel, conten
 export const getCachedLesson = async (schoolId, topicHash, gradeLevel) => {
     try {
         const result = await pool.query(
-            `SELECT lesson_content, audio_url, video_url FROM lessons_cache
+            `SELECT id, lesson_content, audio_url, video_url FROM lessons_cache
             WHERE school_id = $1 AND topic_hash = $2 AND grade_level = $3
             AND expires_at > CURRENT_TIMESTAMP`,
             [schoolId, topicHash, gradeLevel]

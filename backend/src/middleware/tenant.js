@@ -1,4 +1,5 @@
 import pool from '../db.js';
+import jwt from 'jsonwebtoken';
 
 /**
  * Tenant middleware - extracts tenant context from subdomain or header
@@ -63,17 +64,27 @@ export const tenantMiddleware = async (req, res, next) => {
  */
 export const verifyStudentToken = (req, res, next) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
+        const authHeader = req.headers.authorization;
+        const token = authHeader && authHeader.split(' ')[1];
         
         if (!token) {
             return res.status(401).json({ error: 'No token provided' });
         }
 
-        // TODO: Verify JWT token here
-        // For now, just pass through
+        const secret = process.env.JWT_SECRET || 'your-secret-key';
+        const decoded = jwt.verify(token, secret);
+        
+        req.student = {
+            id: decoded.studentId,
+            admissionNumber: decoded.admissionNumber,
+            educationLevel: decoded.educationLevel,
+            gradeClass: decoded.gradeClass
+        };
+        
         next();
     } catch (error) {
-        res.status(401).json({ error: 'Invalid token' });
+        console.error('JWT Token Verification Error:', error.message);
+        res.status(401).json({ error: 'Invalid or expired token' });
     }
 };
 

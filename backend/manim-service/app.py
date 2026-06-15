@@ -13,7 +13,7 @@ from dotenv import load_dotenv  # pyre-ignore[21]
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # type: ignore
 
 # Directory for storing rendered videos
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), 'videos')
