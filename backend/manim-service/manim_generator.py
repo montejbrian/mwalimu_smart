@@ -36,38 +36,38 @@ PREVIOUS CODE:
         bg_instruction = ""
         if bg_image_path:
             bg_instruction = f"""
-# BACKGROUND IMAGE
-A background image is available at: '{bg_image_path}'.
-You MUST load this image using `ImageMobject('{bg_image_path}')` and scale it to fit the screen.
-Place your animations ON TOP of this image. Use it as a reference for your labels and arrows.
+# IMAGE USAGE (MINIMAL SIZE)
+An image is available at: '{bg_image_path}'.
+DO NOT use it as a fullscreen background. 
+If you use it, you MUST load this image using `ImageMobject('{bg_image_path}')` and scale it to a minimal size (e.g., width 2.0 or 3.0) to fit in the room with other objects.
 Example: 
-bg = ImageMobject('{bg_image_path}').scale_to_fit_width(config.frame_width)
-self.add(bg)
+img = ImageMobject('{bg_image_path}').scale_to_fit_width(2.0).to_corner(UL)
+self.add(img)
 """
 
         prompt = f"""
 # CONTEXT
-You are a Manim Programmer Agent for MwalimuSmart. You create educational animations synchronized with voiceovers.
+You are a Manim Programmer Agent for MwalimuSmart. You create educational animations.
 
 # OBJECTIVE
-Generate Python code using 'manim' and 'manim-voiceover' for:
+Generate Python code using 'manim' for:
 Topic: {topic}
 Step: {step_text}
-Narration Script: {script or step_text}
 
 {bg_instruction}
 
-# VISUAL ARRANGEMENT
-1. **NO OVERLAP**: Geometric shapes, text, and labels MUST NOT overlap.
-2. **GROUPING**: Use 'VGroup' to manage multiple objects.
-3. **SPACING**: Use '.arrange(DOWN, buff=0.5)' or '.next_to(other_obj, RIGHT, buff=1.0)'.
-4. **LABELS**: Always place labels using '.next_to(object, direction)' logic.
-5. **DETAIL**: Build rich scenes. If explaining a circuit, show the battery, wires, resistor, and current flow arrows.
+# VISUAL ARRANGEMENT & EXPLANATION
+1. **OBJECTS IN MOTION**: You MUST focus on generating shapes and objects set in motion to explain the concept. DO NOT rely heavily on images. Build rich, dynamic scenes using Manim shapes (Circles, Rectangles, Arrows, etc.).
+2. **NO OVERLAP**: Geometric shapes, text, and labels MUST NOT overlap.
+3. **GROUPING**: Use 'VGroup' to manage multiple objects.
+4. **SPACING**: Use '.arrange(DOWN, buff=0.5)' or '.next_to(other_obj, RIGHT, buff=1.0)'.
+5. **LABELS**: Always place labels using '.next_to(object, direction)' logic.
+6. **DETAIL**: Build rich scenes. If explaining a circuit, show the battery, wires, resistor, and current flow arrows using geometric primitives.
 
 # STYLE (CLEAR Framework)
-1. **CONCISE**: Every animation must be educational, but NOT sparse. Create a comprehensive visual representation.
-2. **LOGICAL**: Synchronize visuals inside 'with self.voiceover(...) as tracker:' blocks.
-3. **EXPLICIT**: Use EXACT Narration Script. High contrast colors only.
+1. **CONCISE**: Every animation must be educational, but NOT sparse. Create a comprehensive visual representation with moving shapes.
+2. **LOGICAL**: Sequence your animations carefully.
+3. **EXPLICIT**: High contrast colors only.
 
 # RESPONSE FORMAT
 Return ONLY the complete Python code. No explanations.
@@ -75,13 +75,9 @@ Return ONLY the complete Python code. No explanations.
 # EXAMPLE STRUCTURE
 ```python
 from manim import *
-from manim_voiceover import VoiceoverScene
-from manim_voiceover.services.gtts import GTTSService
 
-class GeneratedScene(VoiceoverScene):
+class GeneratedScene(Scene):
     def construct(self):
-        self.set_speech_service(GTTSService())
-        
         # 1. Setup rich environment
         axes = Axes(x_range=[0, 5], y_range=[0, 5], axis_config={{"include_tip": True}})
         labels = axes.get_axis_labels(x_label="Time", y_label="Value")
@@ -93,18 +89,43 @@ class GeneratedScene(VoiceoverScene):
         
         main_vgroup = VGroup(axes, labels, circle, dot, trace).center()
         
-        # 3. Synchronized animation
-        with self.voiceover(text="EXACT SCRIPT HERE") as tracker:
-            self.play(Create(axes), Write(labels))
-            self.play(Create(circle))
-            self.add(trace)
-            self.play(MoveAlongPath(dot, circle), run_time=tracker.duration)
+        # 3. Animation sequence
+        self.play(Create(axes), Write(labels))
+        self.play(Create(circle))
+        self.add(trace)
+        self.play(MoveAlongPath(dot, circle), run_time=5)
 ```
 """
     
-    response = model.generate_content(prompt)
-    code = response.text
+    import json
+    import urllib.request
     
+    print(f"Generating Manim code using NVIDIA API...")
+    nvidia_api_key = os.getenv("NVIDIA_API_KEY")
+    if not nvidia_api_key:
+        raise Exception("NVIDIA_API_KEY is not set.")
+        
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {nvidia_api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "meta/llama-3.1-70b-instruct",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+        "top_p": 1,
+        "max_tokens": 2048,
+    }
+    
+    req = urllib.request.Request(url, headers=headers, data=json.dumps(data).encode('utf-8'))
+    try:
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            code = result['choices'][0]['message']['content']
+    except Exception as nvidia_e:
+        raise Exception(f"NVIDIA API failed. Error: {str(nvidia_e)}")
+
     # Clean the code (remove markdown code blocks if present)
     if '```python' in code:
         code = code.split('```python')[1].split('```')[0]

@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { generateAudio } from './tts.service.js';
 import fs from 'fs';
 import path from 'path';
@@ -11,9 +10,6 @@ function ensureCacheDir() {
         fs.mkdirSync(CACHE_DIR, { recursive: true });
     }
 }
-
-const getGenAI = () => new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const getModelName = () => process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 /**
  * Simple Semaphore to limit concurrent AI requests
@@ -49,92 +45,63 @@ class Semaphore {
     }
 }
 
-// Ensure gemini-2.5-flash doesn't get slammed. Serialize requests (limit: 1)
-const geminiSemaphore = new Semaphore(1);
-
-
-/*Helper to retry an operation with exponential backoff*/
-async function retryOperation(
-    operation,
-    maxRetries = 3,
-    baseDelay = 1000
-) {
-    let lastError;
-
-    for (let i = 0; i < maxRetries; i++) {
-        try {
-            return await operation();
-        } catch (error) {
-            lastError = error;
-
-            // For rate limit (429) or high demand (503), use much longer delays
-            const isRateLimited = error.status === 429 || error.status === 503;
-            if (isRateLimited) {
-                const retryDelay = 20000 * Math.pow(2, i); // 20s, 40s, 80s, 160s
-                const maxRetriesTotal = Math.max(maxRetries, 5);
-                console.warn(`Attempt ${i + 1}/${maxRetriesTotal} failed with ${error.status} (Busy). Retrying in ${retryDelay}ms...`);
-                
-                if (i < maxRetriesTotal - 1) {
-                    await new Promise(resolve => setTimeout(resolve, retryDelay));
-                    continue;
-                }
-            }
-
-            const effectiveDelay = baseDelay * Math.pow(2, i);
-            console.warn(`Attempt ${i + 1}/${maxRetries} failed: ${error.message}. Retrying in ${effectiveDelay}ms...`);
-
-            if (i < maxRetries - 1) {
-                await new Promise(resolve => setTimeout(resolve, effectiveDelay));
-            } else {
-                break;
-            }
-        }
-    }
-
-    // Provide a clearer error message for rate limits or high demand
-    if (lastError?.status === 429 || lastError?.status === 503) {
-        const errorType = lastError.status === 429 ? 'Rate limit exceeded' : 'AI service high demand (503)';
-        const err = new Error(`Gemini ${errorType}. Please try again in a minute.`);
-        err.status = lastError.status;
-        throw err;
-    }
-
-    throw lastError;
-}
-
-/**
- * Validates the model name and provides feedback if it's likely incorrect.
- */
-async function validateModel(modelName) {
-    if (modelName.includes('2.5')) {
-        // Reduced noise as user specifically requested this model
-        console.log(`[AI] Active model: ${modelName} (Experimental Mode)`);
-    } else {
-        console.log(`[AI] Using model: ${modelName}`);
-    }
-}
+const nvidiaSemaphore = new Semaphore(1);
 
 /*Helper to clean JSON string from markdown code blocks and comments*/
 export function cleanJsonString(text) {
     let extracted = text;
-    // Try to extract content between ```json and ```
     const jsonBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (jsonBlockMatch && jsonBlockMatch[1]) {
         extracted = jsonBlockMatch[1];
     } else {
-        // Fallback: try to find the first { and last }
         const firstBrace = text.indexOf('{');
         const lastBrace = text.lastIndexOf('}');
         if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
             extracted = text.substring(firstBrace, lastBrace + 1);
+        } else {
+            const firstSquare = text.indexOf('[');
+            const lastSquare = text.lastIndexOf(']');
+            if (firstSquare !== -1 && lastSquare !== -1 && lastSquare > firstSquare) {
+                extracted = text.substring(firstSquare, lastSquare + 1);
+            }
         }
     }
 
-    let cleaned = extracted.replace(/```(?:json)?\n?|\n?```/g, ''); // Just in case
+    let cleaned = extracted.replace(/```(?:json)?\n?|\n?```/g, ''); 
     cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
     cleaned = cleaned.replace(/(^|[^:])\/\/.*$/gm, '$1');
 
     return cleaned.trim();
+}
+
+async function callNvidiaApi(promptText) {
+    const nvidiaApiKey = process.env.NVIDIA_API_KEY;
+    if (!nvidiaApiKey) {
+        throw new Error("NVIDIA_API_KEY is not set.");
+    }
+    
+    const payload = {
+        model: "meta/llama-3.1-70b-instruct",
+        messages: [{ role: "user", content: promptText }],
+        temperature: 0.2,
+        top_p: 1,
+        max_tokens: 2048,
+    };
+    
+    const nvidiaResponse = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${nvidiaApiKey}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+    });
+    
+    if (!nvidiaResponse.ok) {
+        throw new Error(`NVIDIA API failed with status: ${nvidiaResponse.status}`);
+    }
+    const data = await nvidiaResponse.json();
+    return data.choices[0].message.content;
 }
 
 /*Generate a structured lesson from a question, optional image, and optional weaknesses for reteaching*/
@@ -145,12 +112,7 @@ export async function generateLesson(
     weaknesses = null,
     ragContext = ""
 ) {
-    const modelName = getModelName();
-    await validateModel(modelName);
-
-    const model = getGenAI().getGenerativeModel({
-        model: modelName
-    });
+    console.log(`[AI] Active model: NVIDIA meta/llama-3.1-70b-instruct`);
 
     const levelGuidelines = {
         "lower-primary": "Lower Primary (Grade 1-3): Use very simple language, short sentences, many analogies, and a very encouraging tone. Avoid any technical jargon. Focus on basic observable facts.",
@@ -228,35 +190,15 @@ Return your response as a strictly valid JSON object:
 - IMPORTANT: No markdown formatting or comments inside the JSON.
 `;
 
-
-    const parts = [
-        { text: systemPrompt },
-        { text: `\n\nStudent Question: ${question}` }
-    ];
-
-    if (imageBase64) {
-        const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-        parts.push({
-            inlineData: {
-                mimeType: 'image/jpeg',
-                data: base64Data
-            }
-        });
-    }
+    const promptText = systemPrompt + "\n\nStudent Question: " + question + (imageBase64 ? "\n[Note: Image context was provided but ignored for text generation]" : "");
 
     try {
-        const result = await geminiSemaphore.run(() => 
-            retryOperation(() => model.generateContent(parts))
-        );
-        if (!result || !result.response) throw new Error('Empty response from AI');
-        const text = result.response.text();
-
+        const text = await nvidiaSemaphore.run(() => callNvidiaApi(promptText));
         const cleanedText = cleanJsonString(text);
         const lessonData = JSON.parse(cleanedText);
         return lessonData;
     } catch (error) {
-        if (error.status === 429 || error.status === 503) throw error;
-        console.error('Lesson Generation Error:', error);
+        console.error('Lesson Generation Error (NVIDIA):', error);
         throw new Error('Lesson generation failed. Please try again.');
     }
 }
@@ -264,9 +206,7 @@ Return your response as a strictly valid JSON object:
 /*Generate audio narration for a given text using Google Cloud Text-to-Speech*/
 export async function generateAudioNarration(text) {
     try {
-        const audioBase64 = await geminiSemaphore.run(() => 
-            retryOperation(() => generateAudio(text))
-        );
+        const audioBase64 = await nvidiaSemaphore.run(() => generateAudio(text));
         return {
             text,
             audioBase64,
@@ -290,21 +230,7 @@ export async function generateVisualInstructions(
     script,
     level = "senior-school"
 ) {
-
-    const modelName = getModelName();
-    await validateModel(modelName);
-
-    const model = getGenAI().getGenerativeModel({
-        model: modelName
-    });
-
-    const levelVisualGuideline = {
-        "lower-primary": "Keep diagrams extremely simple. Use bright colors and basic shapes. Focus on one main idea per step.",
-        "upper-primary": "Use clear diagrams with labels. Focus on show-and-tell style visuals.",
-        "junior-school": "Introduce more detailed diagrams, parts of a system, and basic process flows.",
-        "senior-school": "Use technical diagrams, chemical structures, physics forces, and detailed mathematical representations.",
-            "university": "Professional-grade academic illustrations, complex molecular structures, intricate flowcharts, and rigorous data visualizations."
-    };
+    console.log(`[AI] Active model: NVIDIA meta/llama-3.1-70b-instruct`);
 
     const prompt = `
 # CONTEXT
@@ -353,7 +279,6 @@ Generate a JSON array of objects:
 `;
 
     try {
-        // 1. Check Cache
         const cacheRaw = `${topic}:${stepText}:${script}:${level}`;
         const hash = crypto.createHash('md5').update(cacheRaw).digest('hex');
         const cacheFilePath = path.join(CACHE_DIR, `${hash}.json`);
@@ -364,13 +289,10 @@ Generate a JSON array of objects:
             return JSON.parse(cachedData);
         }
 
-        console.log(`Visual cache miss for step ${stepNumber}. Generating...`);
+        console.log(`Visual cache miss for step ${stepNumber}. Generating with NVIDIA...`);
         ensureCacheDir();
-        const result = await geminiSemaphore.run(() => 
-            retryOperation(() => model.generateContent(prompt))
-        );
-        const response = result.response;
-        const text = response.text();
+        
+        const text = await nvidiaSemaphore.run(() => callNvidiaApi(prompt));
 
         const cleanedText = cleanJsonString(text);
         const instructions = JSON.parse(cleanedText);
@@ -382,8 +304,7 @@ Generate a JSON array of objects:
 
         return instructions;
     } catch (error) {
-        if (error.status === 429) throw error;
-        console.error('Failed to parse Gemini response for Visuals:', error);
+        console.error('Failed to parse response for Visuals (NVIDIA):', error);
         throw new Error('Failed to parse visual instructions from AI response');
     }
 }
