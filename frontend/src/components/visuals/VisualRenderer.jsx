@@ -4,6 +4,7 @@ import NumberLine from "./templates/NumberLine.jsx";
 import FractionBar from "./templates/FractionBar.jsx";
 import Flowchart from "./templates/Flowchart.jsx";
 import GraphPlot from "./templates/GraphPlot.jsx";
+import Whiteboard from "./Whiteboard.jsx";
 
 const TEMPLATE_COMPONENTS = {
   equation_balance: EquationBalance,
@@ -11,6 +12,7 @@ const TEMPLATE_COMPONENTS = {
   fraction_bar: FractionBar,
   flowchart: Flowchart,
   graph_plot: GraphPlot,
+  whiteboard: Whiteboard,
 };
 
 /**
@@ -44,9 +46,18 @@ export default function VisualRenderer({ visualSpec, template_id, params }) {
     );
   }
 
+  const mergedParams =
+    activeTemplateId === "whiteboard"
+      ? {
+          ops: spec.ops || activeParams.ops || [],
+          title: spec.title || activeParams.title,
+          ...activeParams,
+        }
+      : activeParams;
+
   return (
     <div data-testid="visual-container" className="my-2">
-      <Component {...activeParams} />
+      <Component {...mergedParams} />
     </div>
   );
 }

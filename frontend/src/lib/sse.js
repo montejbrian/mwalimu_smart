@@ -82,7 +82,7 @@ export function createSSEParser(onMessage) {
 export async function streamSSE(
   url,
   { method = "POST", headers = {}, body, signal } = {},
-  { onToken, onEvent, onVisualQueued, onVisualReady, onDone, onError } = {}
+  { onToken, onEvent, onVisualQueued, onVisualReady, onWhiteboardOp, onDone, onError } = {}
 ) {
   const controller = new AbortController();
   const activeSignal = signal || controller.signal;
@@ -124,6 +124,8 @@ export async function streamSSE(
 
       if (event === "token" && data?.token !== undefined) {
         onToken?.(data.token, data);
+      } else if (event === "whiteboard_op") {
+        onWhiteboardOp?.(data);
       } else if (event === "visual_queued") {
         onVisualQueued?.(data);
       } else if (event === "visual_ready") {

@@ -126,6 +126,30 @@ def route_by_heuristics(question: str, lesson_title: str) -> dict[str, Any] | No
     return None
 
 
+def check_whiteboard_heuristic(question: str, lesson_title: str) -> dict[str, Any] | None:
+    """
+    Checks if a follow-up question requests progressive whiteboard step-by-step draw ops (Phase 4.2).
+    """
+    q = question.lower()
+    whiteboard_keywords = [
+        "whiteboard", "chalkboard", "on the board", "on board", "ubao",
+        "step by step", "show step by step", "hatua kwa hatua",
+        "draw step by step", "write on board", "show on board",
+        "solve on board", "progressive whiteboard",
+    ]
+    if any(kw in q for kw in whiteboard_keywords):
+        from followups.whiteboard import generate_mock_whiteboard_ops
+        mock_ops = list(generate_mock_whiteboard_ops(question, lesson_title))
+        return {
+            "match": True,
+            "tier": "whiteboard",
+            "template_id": "whiteboard",
+            "title": f"Whiteboard: {lesson_title}",
+            "ops": mock_ops,
+        }
+    return None
+
+
 def check_tier2_heuristic(question: str, lesson_title: str) -> dict[str, Any] | None:
     """
     Checks if a follow-up question requests a dynamic Manim animation (Tier 2).
@@ -166,6 +190,11 @@ def route_visual(question: str, lesson_title: str) -> dict[str, Any]:
             "concept": question.strip(),
             "scene_prompt": f"Manim visualization illustrating: {question.strip()} for lesson: {lesson_title}",
         }
+
+    # 0. Check progressive whiteboard request (<5ms)
+    whiteboard_match = check_whiteboard_heuristic(question, lesson_title)
+    if whiteboard_match:
+        return whiteboard_match
 
     # 1. Fast Tier 1 heuristics (<5ms)
     fast_match = route_by_heuristics(question, lesson_title)

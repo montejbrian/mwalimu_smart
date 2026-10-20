@@ -32,6 +32,7 @@ import { followupsApi, voiceApi } from "../../lib/api.js";
 import { streamSSE } from "../../lib/sse.js";
 import { useStore, useFollowUpStore } from "../../lib/store.js";
 import VisualRenderer from "../visuals/VisualRenderer.jsx";
+import Whiteboard from "../visuals/Whiteboard.jsx";
 
 function Tier2PlaceholderCard({ jobId, lang, queuedAt, onRetry }) {
   const [elapsed, setElapsed] = useState(0);
@@ -552,6 +553,24 @@ export default function FollowUpPanel({
               )
             );
           },
+          onWhiteboardOp: (op) => {
+            setLocalMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMsgId
+                  ? {
+                      ...msg,
+                      has_visual: true,
+                      visual_loading: false,
+                      visual_spec: {
+                        tier: "whiteboard",
+                        template_id: "whiteboard",
+                        ops: [...(msg.visual_spec?.ops || []), op],
+                      },
+                    }
+                  : msg
+              )
+            );
+          },
           onDone: (data) => {
             setIsStreamingLocal(false);
             setStreamingStore(false);
@@ -737,6 +756,18 @@ export default function FollowUpPanel({
                     </span>
                   </div>
                 )}
+                {/* Progressive Whiteboard Canvas (Phase 4.2) */}
+                {(m.has_visual || m.visual_spec) &&
+                  (m.visual_spec?.tier === "whiteboard" || m.visual_spec?.template_id === "whiteboard") && (
+                    <div className="mt-2.5">
+                      <Whiteboard
+                        ops={m.visual_spec.ops || []}
+                        title={m.visual_spec.title || (lang === "sw" ? "Ubao wa Hatua kwa Hatua" : "Progressive Whiteboard")}
+                        isStreaming={m.isStreaming}
+                      />
+                    </div>
+                  )}
+
                 {/* Tier 1 Interactive SVG Visual */}
                 {(m.has_visual || m.visual_spec) && m.visual_spec?.tier === 1 && m.visual_spec?.template_id && (
                   <div className="mt-2 pt-1">

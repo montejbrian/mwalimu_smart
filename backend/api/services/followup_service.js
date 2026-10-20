@@ -397,6 +397,35 @@ export async function streamFollowUpResponse({
           } catch {
             // Mongo queue insertion is non-blocking to stream
           }
+        } else if (visualResult.tier === "whiteboard") {
+          // Progressive Whiteboard: stream draw ops directly to client
+          matchedVisualSpec = {
+            tier: "whiteboard",
+            template_id: "whiteboard",
+            title: visualResult.title || `Whiteboard: ${ctx.title}`,
+            ops: visualResult.ops || [],
+          };
+
+          res.write(
+            `event: visual_queued\ndata: ${JSON.stringify({
+              tier: "whiteboard",
+              template_id: "whiteboard",
+              status: "streaming",
+              placeholder: "Streaming progressive whiteboard...",
+            })}\n\n`
+          );
+
+          if (Array.isArray(visualResult.ops)) {
+            for (const op of visualResult.ops) {
+              res.write(
+                `event: whiteboard_op\ndata: ${JSON.stringify(op)}\n\n`
+              );
+            }
+          }
+
+          res.write(
+            `event: visual_ready\ndata: ${JSON.stringify(matchedVisualSpec)}\n\n`
+          );
         }
         return matchedVisualSpec;
       })
