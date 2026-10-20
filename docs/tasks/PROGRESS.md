@@ -29,4 +29,6 @@
 | P4.2 | done | 2026-10-20 | Added progressive chalkboard/whiteboard draw op stream (write, equation, highlight, arrow, clear), Whiteboard.jsx canvas with step/auto-play controls, SSE whiteboard_op emission, Postgres visual_spec persistence, and p4_2_whiteboard.test.js |
 | P4.3 | skipped | 2026-10-20 | Skipped SMS / USSD follow-up stub (Africa's Talking) per user request |
 | P4.4 | done | 2026-10-20 | Added adaptive recommendations using student mastery map gaps, continuous session-persisted Kiswahili toggle, and standalone Ask Tutor page (/ask AskPage.jsx) with voice & whiteboard |
+| G10-GEOG | done | 2026-10-20 | Seeded KICD Grade 10 Senior Secondary Geography, pre-generated canvas video + WebVTT assets, transcripts, and formative MCQs for test strands (Practical Geography & Natural Systems), verified with grade10_geography.test.js |
+
 

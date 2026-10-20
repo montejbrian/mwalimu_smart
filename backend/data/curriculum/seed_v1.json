@@ -14,20 +14,23 @@
     { "id": 61, "level_id": 2, "name": "Grade 6", "sort_order": 6 },
     { "id": 71, "level_id": 3, "name": "Grade 7", "sort_order": 7 },
     { "id": 81, "level_id": 3, "name": "Grade 8", "sort_order": 8 },
-    { "id": 91, "level_id": 3, "name": "Grade 9", "sort_order": 9 }
+    { "id": 91, "level_id": 3, "name": "Grade 9", "sort_order": 9 },
+    { "id": 101, "level_id": 4, "name": "Grade 10", "sort_order": 10 }
   ],
   "subjects": [
     { "code": "mathematics", "name_en": "Mathematics", "name_sw": "Hisabati" },
     { "code": "integrated_science", "name_en": "Integrated Science", "name_sw": "Sayansi Jumuishi" },
     { "code": "science_technology", "name_en": "Science and Technology", "name_sw": "Sayansi na Teknolojia" },
     { "code": "english", "name_en": "English", "name_sw": "Kiingereza" },
-    { "code": "kiswahili", "name_en": "Kiswahili", "name_sw": "Kiswahili" }
+    { "code": "kiswahili", "name_en": "Kiswahili", "name_sw": "Kiswahili" },
+    { "code": "geography", "name_en": "Geography", "name_sw": "Jiografia" }
   ],
   "grade_subjects": [
     { "grade_id": 71, "subject_code": "mathematics", "curriculum_ref": "KICD-JSS-G7-MATH" },
     { "grade_id": 71, "subject_code": "integrated_science", "curriculum_ref": "KICD-JSS-G7-ISCI" },
     { "grade_id": 71, "subject_code": "english", "curriculum_ref": "KICD-JSS-G7-ENG" },
-    { "grade_id": 71, "subject_code": "kiswahili", "curriculum_ref": "KICD-JSS-G7-KIS" }
+    { "grade_id": 71, "subject_code": "kiswahili", "curriculum_ref": "KICD-JSS-G7-KIS" },
+    { "grade_id": 101, "subject_code": "geography", "curriculum_ref": "KICD-SSS-G10-GEOG" }
   ],
   "strands": [
     {
@@ -390,6 +393,72 @@
             "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
           ],
           "competencies": ["citizenship", "problem solving"]
+        }
+      ]
+    },
+    {
+      "grade_id": 101,
+      "subject_code": "geography",
+      "name": "Practical Geography",
+      "sort_order": 1,
+      "description": "Foundations of geographic study, branches, career pathways, and topographical map analysis.",
+      "substrands": [
+        {
+          "name": "Introduction to Geography",
+          "sort_order": 1,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to analyse the branches of Geography for in-depth understanding of the subject",
+            "By the end of the sub-strand, the learner should be able to examine the importance of studying Geography for sustainable development",
+            "By the end of the sub-strand, the learner should be able to explore the relationship between Geography and other disciplines for identification of career pathways",
+            "By the end of the sub-strand, the learner should be able to select possible careers from branches of Geography in society",
+            "By the end of the sub-strand, the learner should be able to appreciate the significance of Geography in day-to-day life"
+          ],
+          "competencies": ["critical thinking", "communication", "citizenship", "digital literacy"],
+          "tier": "featured"
+        },
+        {
+          "name": "Map Reading and Interpretation",
+          "sort_order": 2,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to illustrate the various methods of representing relief on topographical maps",
+            "By the end of the sub-strand, the learner should be able to interpret relief, drainage and vegetation on topographical maps for resource mapping",
+            "By the end of the sub-strand, the learner should be able to draw sketch sections from topographical maps for interpreting relief",
+            "By the end of the sub-strand, the learner should be able to appreciate the use of map reading and interpretation skills for national development"
+          ],
+          "competencies": ["problem solving", "spatial analysis", "critical thinking"],
+          "tier": "standard"
+        }
+      ]
+    },
+    {
+      "grade_id": 101,
+      "subject_code": "geography",
+      "name": "Natural Systems and Processes",
+      "sort_order": 2,
+      "description": "Internal and external earth processes, classification of rocks, folding, vulcanicity, and earthquakes.",
+      "substrands": [
+        {
+          "name": "Rocks",
+          "sort_order": 1,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to examine the classification of rocks according to mode of formation and age",
+            "By the end of the sub-strand, the learner should be able to describe the distribution of rocks in Kenya",
+            "By the end of the sub-strand, the learner should be able to analyse the significance of rocks in Kenya",
+            "By the end of the sub-strand, the learner should be able to sample rock types in their locality",
+            "By the end of the sub-strand, the learner should be able to appreciate the economic and environmental significance of rocks in Kenya"
+          ],
+          "competencies": ["critical thinking", "scientific inquiry", "environmental awareness"],
+          "tier": "featured"
+        },
+        {
+          "name": "Vulcanicity",
+          "sort_order": 2,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to explain the processes and features resulting from intrusive and extrusive vulcanicity in the Kenyan Rift Valley",
+            "By the end of the sub-strand, the learner should be able to assess the positive and negative effects of vulcanicity on human activities in Kenya"
+          ],
+          "competencies": ["scientific inquiry", "critical thinking"],
+          "tier": "standard"
         }
       ]
     }

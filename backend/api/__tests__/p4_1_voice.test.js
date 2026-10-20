@@ -86,6 +86,7 @@ describe("P4.1 — Voice Assistant Embedded in Lesson (/api/voice/* & Follow-up 
        LIMIT 1`
     );
     const strandId = ssRes.rows[0].id;
+    await pool.query(`DELETE FROM substrands WHERE strand_id = $1 AND sort_order = 991`, [strandId]);
     const subRes = await pool.query(
       `INSERT INTO substrands (strand_id, name, sort_order)
        VALUES ($1, 'P4.1 Voice Isolated Substrand', 991)

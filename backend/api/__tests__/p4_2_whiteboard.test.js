@@ -83,6 +83,7 @@ describe("P4.2 — Progressive Whiteboard Op Stream (/api/followups/*)", () => {
        LIMIT 1`
     );
     const strandId = ssRes.rows[0].id;
+    await pool.query(`DELETE FROM substrands WHERE strand_id = $1 AND sort_order = 992`, [strandId]);
     const subRes = await pool.query(
       `INSERT INTO substrands (strand_id, name, sort_order)
        VALUES ($1, 'P4.2 Whiteboard Isolated Substrand', 992)
