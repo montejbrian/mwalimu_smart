@@ -1,0 +1,18 @@
+# MwalimuSmart Web — Railway deployment
+# https://railway.app
+#
+# 1. Push this repo to GitHub
+# 2. Connect to Railway → New Project → Deploy from GitHub
+# 3. Add environment variables in Railway dashboard (see .env.example)
+# 4. Railway auto-detects Dockerfile and deploys
+
+[build]
+builder    = "DOCKERFILE"
+dockerfilePath = "deploy/Dockerfile"
+
+[deploy]
+startCommand   = "node backend/api/server.js"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType  = "ON_FAILURE"
+restartPolicyMaxRetries = 3

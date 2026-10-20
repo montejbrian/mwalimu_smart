@@ -1,0 +1,397 @@
+{
+  "levels": [
+    { "id": 1, "name": "Pre-Primary", "sort_order": 1 },
+    { "id": 2, "name": "Primary", "sort_order": 2 },
+    { "id": 3, "name": "Junior Secondary", "sort_order": 3 },
+    { "id": 4, "name": "Senior Secondary", "sort_order": 4 }
+  ],
+  "grades": [
+    { "id": 11, "level_id": 2, "name": "Grade 1", "sort_order": 1 },
+    { "id": 21, "level_id": 2, "name": "Grade 2", "sort_order": 2 },
+    { "id": 31, "level_id": 2, "name": "Grade 3", "sort_order": 3 },
+    { "id": 41, "level_id": 2, "name": "Grade 4", "sort_order": 4 },
+    { "id": 51, "level_id": 2, "name": "Grade 5", "sort_order": 5 },
+    { "id": 61, "level_id": 2, "name": "Grade 6", "sort_order": 6 },
+    { "id": 71, "level_id": 3, "name": "Grade 7", "sort_order": 7 },
+    { "id": 81, "level_id": 3, "name": "Grade 8", "sort_order": 8 },
+    { "id": 91, "level_id": 3, "name": "Grade 9", "sort_order": 9 }
+  ],
+  "subjects": [
+    { "code": "mathematics", "name_en": "Mathematics", "name_sw": "Hisabati" },
+    { "code": "integrated_science", "name_en": "Integrated Science", "name_sw": "Sayansi Jumuishi" },
+    { "code": "science_technology", "name_en": "Science and Technology", "name_sw": "Sayansi na Teknolojia" },
+    { "code": "english", "name_en": "English", "name_sw": "Kiingereza" },
+    { "code": "kiswahili", "name_en": "Kiswahili", "name_sw": "Kiswahili" }
+  ],
+  "grade_subjects": [
+    { "grade_id": 71, "subject_code": "mathematics", "curriculum_ref": "KICD-JSS-G7-MATH" },
+    { "grade_id": 71, "subject_code": "integrated_science", "curriculum_ref": "KICD-JSS-G7-ISCI" },
+    { "grade_id": 71, "subject_code": "english", "curriculum_ref": "KICD-JSS-G7-ENG" },
+    { "grade_id": 71, "subject_code": "kiswahili", "curriculum_ref": "KICD-JSS-G7-KIS" }
+  ],
+  "strands": [
+    {
+      "grade_id": 71,
+      "subject_code": "mathematics",
+      "name": "Numbers",
+      "sort_order": 1,
+      "description": "Operations on whole numbers, factors, fractions, decimals, and squares/square roots.",
+      "substrands": [
+        {
+          "name": "Whole Numbers",
+          "sort_order": 1,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to use place value and total value of digits up to hundreds of millions in real life",
+            "By the end of the sub-strand, the learner should be able to read and write numbers in symbols and in words up to hundreds of millions"
+          ],
+          "competencies": ["critical thinking", "communication", "digital literacy"],
+          "tier": "featured"
+        },
+        {
+          "name": "Factors",
+          "sort_order": 2,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to test divisibility of numbers by 2, 3, 4, 5, 6, 8, 9, 10 and 11",
+            "By the end of the sub-strand, the learner should be able to apply GCD and LCM in real-life situations"
+          ],
+          "competencies": ["critical thinking", "problem solving"]
+        },
+        {
+          "name": "Fractions",
+          "sort_order": 3,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to compare, add, subtract, multiply and divide fractions in different situations"
+          ],
+          "competencies": ["critical thinking", "problem solving"],
+          "tier": "featured"
+        },
+        {
+          "name": "Decimals",
+          "sort_order": 4,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to identify place value and total value of digits in decimals and perform combined operations"
+          ],
+          "competencies": ["critical thinking", "communication"]
+        },
+        {
+          "name": "Squares and Square Roots",
+          "sort_order": 5,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to determine squares and square roots of whole numbers, fractions and decimals"
+          ],
+          "competencies": ["critical thinking", "problem solving"]
+        }
+      ]
+    },
+    {
+      "grade_id": 71,
+      "subject_code": "mathematics",
+      "name": "Algebra",
+      "sort_order": 2,
+      "description": "Forming and simplifying algebraic expressions, linear equations, and linear inequalities.",
+      "substrands": [
+        {
+          "name": "Algebraic Expressions",
+          "sort_order": 1,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to form and simplify algebraic expressions in real-life situations"
+          ],
+          "competencies": ["critical thinking", "creativity"],
+          "tier": "featured"
+        },
+        {
+          "name": "Linear Equations",
+          "sort_order": 2,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to form and solve linear equations in one unknown in real-life situations"
+          ],
+          "competencies": ["critical thinking", "problem solving"],
+          "tier": "featured"
+        },
+        {
+          "name": "Linear Inequalities",
+          "sort_order": 3,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to form, solve and represent simple linear inequalities on a number line"
+          ],
+          "competencies": ["critical thinking", "communication"]
+        }
+      ]
+    },
+    {
+      "grade_id": 71,
+      "subject_code": "mathematics",
+      "name": "Measurements",
+      "sort_order": 3,
+      "description": "Pythagorean relationship, length, area, volume, capacity, time, speed, temperature, and money.",
+      "substrands": [
+        {
+          "name": "Pythagorean Relationship",
+          "sort_order": 1,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to recognize the sides of a right-angled triangle and apply the Pythagorean relationship to real-life situations"
+          ],
+          "competencies": ["critical thinking", "problem solving"],
+          "tier": "featured"
+        },
+        {
+          "name": "Length and Area",
+          "sort_order": 2,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to convert units of length and calculate perimeter and area of plane figures and combined shapes"
+          ],
+          "competencies": ["critical thinking", "problem solving"]
+        },
+        {
+          "name": "Volume and Capacity",
+          "sort_order": 3,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to calculate volume of cubes, cuboids and cylinders and relate volume to capacity"
+          ],
+          "competencies": ["critical thinking", "problem solving"]
+        },
+        {
+          "name": "Time, Distance and Speed",
+          "sort_order": 4,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to relate time, distance and speed and convert units of speed in real-life situations"
+          ],
+          "competencies": ["critical thinking", "citizenship"]
+        }
+      ]
+    },
+    {
+      "grade_id": 71,
+      "subject_code": "mathematics",
+      "name": "Geometry",
+      "sort_order": 4,
+      "description": "Angles, geometrical constructions, scale drawing, and common solids.",
+      "substrands": [
+        {
+          "name": "Angles",
+          "sort_order": 1,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to relate different types of angles on a straight line, at a point, and on a transversal"
+          ],
+          "competencies": ["critical thinking", "problem solving"]
+        },
+        {
+          "name": "Geometrical Constructions",
+          "sort_order": 2,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to measure and bisect angles and construct special angles and triangles using a ruler and a pair of compasses"
+          ],
+          "competencies": ["creativity", "learning to learn"]
+        },
+        {
+          "name": "Scale Drawing",
+          "sort_order": 3,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to represent length to a given scale and convert scale from one form to another"
+          ],
+          "competencies": ["critical thinking", "digital literacy"]
+        }
+      ]
+    },
+    {
+      "grade_id": 71,
+      "subject_code": "mathematics",
+      "name": "Data Handling and Probability",
+      "sort_order": 5,
+      "description": "Collecting, organizing, representing, and interpreting data in tables and graphs.",
+      "substrands": [
+        {
+          "name": "Data Collection and Organization",
+          "sort_order": 1,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to state the meaning of data, collect data from different sources, and prepare frequency distribution tables"
+          ],
+          "competencies": ["communication", "digital literacy"]
+        },
+        {
+          "name": "Data Representation",
+          "sort_order": 2,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to draw pictographs, bar graphs, pie charts, and line graphs to represent data"
+          ],
+          "competencies": ["critical thinking", "communication"],
+          "tier": "featured"
+        },
+        {
+          "name": "Data Interpretation and Travel Graphs",
+          "sort_order": 3,
+          "learning_outcomes": [
+            "By the end of the sub-strand, the learner should be able to interpret bar graphs, pie charts, line graphs, and travel graphs in real-life situations"
+          ],
+          "competencies": ["critical thinking", "problem solving"]
+        }
+      ]
+    },
+    {
+      "grade_id": 71,
+      "subject_code": "integrated_science",
+      "name": "Scientific Investigation",
+      "sort_order": 1,
+      "description": "Introduction to Integrated Science, laboratory safety, and apparatus.",
+      "substrands": [
+        {
+          "name": "Introduction to Integrated Science",
+          "sort_order": 1,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["communication", "critical thinking"]
+        },
+        {
+          "name": "Laboratory Safety",
+          "sort_order": 2,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["citizenship", "communication"]
+        },
+        {
+          "name": "Laboratory Apparatus and Instruments",
+          "sort_order": 3,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["learning to learn", "critical thinking"]
+        }
+      ]
+    },
+    {
+      "grade_id": 71,
+      "subject_code": "integrated_science",
+      "name": "Mixtures, Elements and Compounds",
+      "sort_order": 2,
+      "description": "Classification of mixtures, separation techniques, and acids, bases, and indicators.",
+      "substrands": [
+        {
+          "name": "Mixtures",
+          "sort_order": 1,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["critical thinking", "problem solving"]
+        },
+        {
+          "name": "Separating Mixtures",
+          "sort_order": 2,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["critical thinking", "problem solving"],
+          "tier": "featured"
+        },
+        {
+          "name": "Acids, Bases and Indicators",
+          "sort_order": 3,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["critical thinking", "learning to learn"]
+        }
+      ]
+    },
+    {
+      "grade_id": 71,
+      "subject_code": "integrated_science",
+      "name": "Living Things and Their Environment",
+      "sort_order": 3,
+      "description": "Human reproductive system, skin and urinary excretory system, and ecological interdependence.",
+      "substrands": [
+        {
+          "name": "Reproduction in Human Beings",
+          "sort_order": 1,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["self-efficacy", "communication"]
+        },
+        {
+          "name": "Human Excretory System",
+          "sort_order": 2,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["critical thinking", "self-efficacy"]
+        },
+        {
+          "name": "Interdependence of Living Things",
+          "sort_order": 3,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["citizenship", "critical thinking"]
+        }
+      ]
+    },
+    {
+      "grade_id": 71,
+      "subject_code": "integrated_science",
+      "name": "Force and Energy",
+      "sort_order": 4,
+      "description": "Electrical energy, static electricity, and magnetism.",
+      "substrands": [
+        {
+          "name": "Electrical Energy",
+          "sort_order": 1,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["critical thinking", "problem solving"]
+        },
+        {
+          "name": "Static Electricity",
+          "sort_order": 2,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["critical thinking", "learning to learn"]
+        },
+        {
+          "name": "Magnetism",
+          "sort_order": 3,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["critical thinking", "problem solving"]
+        }
+      ]
+    },
+    {
+      "grade_id": 71,
+      "subject_code": "integrated_science",
+      "name": "Health Education",
+      "sort_order": 5,
+      "description": "Common health concerns, first aid, and environmental hygiene.",
+      "substrands": [
+        {
+          "name": "Common Health Concerns",
+          "sort_order": 1,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["self-efficacy", "citizenship"]
+        },
+        {
+          "name": "First Aid and Safety",
+          "sort_order": 2,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["problem solving", "communication"]
+        },
+        {
+          "name": "Environmental Hygiene",
+          "sort_order": 3,
+          "learning_outcomes": [
+            "TODO(source): populate from KICD design KICD-JSS-G7-ISCI"
+          ],
+          "competencies": ["citizenship", "problem solving"]
+        }
+      ]
+    }
+  ]
+}

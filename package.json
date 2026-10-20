@@ -1,0 +1,20 @@
+{
+  "name": "mwalimusmart-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MwalimuSmart — CBC-aligned AI lesson platform for Kenyan schools",
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "dev":        "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "build":      "npm run build --workspace=frontend",
+    "start":      "npm run start --workspace=backend",
+    "setup:db":   "cd backend && python3 -m scripts.init_db --seed",
+    "setup:ingest":"cd backend && python3 -m rag.ingest --source_dir /var/mwalimusmart/kicd_docs",
+    "db:migrate": "node backend/scripts/migrate.js",
+    "test":       "NODE_ENV=test node --test --test-force-exit 'backend/api/**/__tests__/*.test.js' && cd backend && ./venv/bin/pytest tests/ -v",
+    "worker":     "cd backend && python3 -m workers.manim_worker"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
