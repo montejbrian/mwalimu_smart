@@ -101,6 +101,8 @@ export const followupsApi = {
     api.post(`/followups/lessons/${lessonId}/threads`),
   getHistory: (threadId) =>
     api.get(`/followups/threads/${threadId}`),
+  getSavedThreads: (params) =>
+    api.get("/followups/threads", { params }),
   streamUrl: (threadId) =>
     `/api/followups/threads/${threadId}/messages`,
   getVisualJob: (jobId) =>

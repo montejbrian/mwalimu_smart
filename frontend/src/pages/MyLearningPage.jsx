@@ -25,8 +25,12 @@ import {
   AlertCircle,
   HelpCircle,
   Layers,
+  MessageSquare,
+  Film,
+  Eye,
+  FileQuestion,
 } from "lucide-react";
-import { progressApi } from "../lib/api.js";
+import { progressApi, followupsApi } from "../lib/api.js";
 import { useStore } from "../lib/store.js";
 import { formatPercent } from "../lib/assessment.js";
 import clsx from "clsx";
@@ -68,6 +72,7 @@ export default function MyLearningPage() {
   const [error, setError] = useState(null);
   const [masteryData, setMasteryData] = useState({ summary: {}, subjects: [] });
   const [recentData, setRecentData] = useState({ recent: [], recommendation: null });
+  const [savedThreads, setSavedThreads] = useState([]);
   const [activeSubject, setActiveSubject] = useState("all");
 
   useEffect(() => {
@@ -78,11 +83,13 @@ export default function MyLearningPage() {
     Promise.all([
       progressApi.mastery({ lang }).then((r) => r.data),
       progressApi.recent({ limit: 12, lang }).then((r) => r.data),
+      followupsApi.getSavedThreads({ lang }).then((r) => r.data?.threads || []).catch(() => []),
     ])
-      .then(([mRes, rRes]) => {
+      .then(([mRes, rRes, tRes]) => {
         if (!isMounted) return;
         setMasteryData(mRes || { summary: {}, subjects: [] });
         setRecentData(rRes || { recent: [], recommendation: null });
+        setSavedThreads(tRes || []);
       })
       .catch((err) => {
         if (!isMounted) return;
@@ -546,6 +553,115 @@ export default function MyLearningPage() {
                 );
               })}
             </div>
+          </div>
+        )}
+      </section>
+
+      {/* 6. Saved Q&A & Visuals per Lesson (P3.4) */}
+      <section className="space-y-4" data-testid="saved-qa-section">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-display text-xl font-bold text-ink-100 flex items-center gap-2">
+              <MessageSquare size={20} className="text-brand-400" />
+              {useSw ? "Maswali Yaliyohifadhiwa na Michoro" : "Saved Q&A & Visuals"}
+            </h2>
+            <p className="text-xs text-ink-400 mt-0.5">
+              {useSw
+                ? "Mijadala yako na Mwalimu wa AI, michoro shirikishi, na video za Manim zilizoundwa."
+                : "Your AI office hours discussions, interactive diagrams, and custom Manim videos."}
+            </p>
+          </div>
+          <span className="text-xs font-mono text-ink-400" data-testid="saved-qa-count">
+            {savedThreads.length} {useSw ? "mada" : "threads"}
+          </span>
+        </div>
+
+        {savedThreads.length === 0 ? (
+          <div
+            className="card text-center py-10 border border-[var(--border)] bg-surface-base/50 space-y-2.5"
+            data-testid="saved-qa-empty"
+          >
+            <FileQuestion className="w-9 h-9 text-ink-500 mx-auto" />
+            <h4 className="font-display font-semibold text-ink-200 text-sm">
+              {useSw ? "Bado hakuna maswali yaliyohifadhiwa" : "No saved follow-up questions yet"}
+            </h4>
+            <p className="text-xs text-ink-400 max-w-sm mx-auto">
+              {useSw
+                ? "Unapouliza maswali kwenye somo lolote, majibu ya Mwalimu na michoro itahifadhiwa hapa."
+                : "When you ask questions in any lesson, Mwalimu's explanations and diagrams are saved here."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="saved-qa-list">
+            {savedThreads.map((thread) => {
+              const hasTier1 = thread.saved_visuals?.some((v) => v.tier === 1);
+              const hasTier2 = thread.saved_visuals?.some((v) => v.tier === 2);
+
+              return (
+                <div
+                  key={thread.thread_id}
+                  className="card border border-[var(--border)] bg-surface-card hover:border-brand-500/40 transition-all duration-200 flex flex-col justify-between space-y-3"
+                  data-testid="saved-qa-card"
+                >
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-brand-500/15 border border-brand-500/30 text-brand-300">
+                          {thread.subject_name}
+                        </span>
+                        <span className="text-xs text-ink-400">• {thread.strand_name}</span>
+                      </div>
+                      <span className="text-[11px] font-mono text-ink-500">
+                        {thread.message_count} {useSw ? "jumbe" : "msgs"}
+                      </span>
+                    </div>
+
+                    <h3 className="font-display font-semibold text-ink-100 text-base">
+                      {thread.lesson_title}
+                    </h3>
+
+                    {thread.last_question && (
+                      <div className="p-2.5 rounded-lg bg-surface-base border border-[var(--border)] text-xs text-ink-300 space-y-1">
+                        <div className="font-medium text-ink-200 line-clamp-1">
+                          Q: {thread.last_question}
+                        </div>
+                        {thread.last_answer && (
+                          <div className="text-ink-400 line-clamp-2 text-[11px]">
+                            {thread.last_answer}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
+                    <div className="flex items-center gap-2">
+                      {thread.visual_count > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+                          <Eye size={12} />
+                          <span>{thread.visual_count} visual</span>
+                        </span>
+                      )}
+                      {hasTier2 && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/30 text-purple-300">
+                          <Film size={12} />
+                          <span>Manim</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => navigate(`/lesson/${thread.lesson_id}`)}
+                      className="btn-ghost inline-flex items-center gap-1.5 text-xs font-medium"
+                      data-testid="open-thread-btn"
+                    >
+                      <span>{useSw ? "Fungua Q&A" : "Open Q&A"}</span>
+                      <ArrowRight size={13} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

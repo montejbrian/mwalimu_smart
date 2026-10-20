@@ -117,6 +117,75 @@ export async function getThreadHistory(threadIdRaw, studentId = null) {
 }
 
 /**
+ * GET /api/followups/threads
+ * Returns all saved follow-up Q&A threads for the student across all lessons (P3.4).
+ */
+export async function getStudentSavedThreads({ studentId, lang = "en" }) {
+  const sid = requireStudent(studentId);
+
+  const res = await pool.query(
+    `SELECT
+       ft.id AS thread_id,
+       ft.student_id,
+       ft.lesson_id,
+       ft.created_at,
+       l.title AS lesson_title,
+       ss.name AS substrand_name,
+       st.name AS strand_name,
+       CASE WHEN $2 = 'sw' THEN s.name_sw ELSE s.name_en END AS subject_name,
+       g.name AS grade_name,
+       COUNT(fm.id)::int AS message_count,
+       COUNT(CASE WHEN fm.has_visual = true THEN 1 END)::int AS visual_count,
+       MAX(fm.created_at) AS last_active_at,
+       (
+         SELECT content FROM followup_messages
+         WHERE thread_id = ft.id AND role = 'student'
+         ORDER BY created_at DESC LIMIT 1
+       ) AS last_question,
+       (
+         SELECT content FROM followup_messages
+         WHERE thread_id = ft.id AND role = 'assistant'
+         ORDER BY created_at DESC LIMIT 1
+       ) AS last_answer,
+       (
+         SELECT json_agg(visual_spec) FROM followup_messages
+         WHERE thread_id = ft.id AND has_visual = true AND visual_spec IS NOT NULL
+       ) AS saved_visuals
+     FROM followup_threads ft
+     JOIN lessons l ON l.id = ft.lesson_id
+     JOIN substrands ss ON ss.id = l.substrand_id
+     JOIN strands st ON st.id = ss.strand_id
+     JOIN grade_subjects gs ON gs.id = st.grade_subject_id
+     JOIN subjects s ON s.id = gs.subject_id
+     JOIN grades g ON g.id = gs.grade_id
+     LEFT JOIN followup_messages fm ON fm.thread_id = ft.id
+     WHERE ft.student_id = $1
+     GROUP BY ft.id, ft.student_id, ft.lesson_id, ft.created_at, l.title, ss.name, st.name, s.name_sw, s.name_en, g.name
+     HAVING COUNT(fm.id) > 0
+     ORDER BY MAX(fm.created_at) DESC NULLS LAST, ft.created_at DESC`,
+    [sid, lang === "sw" ? "sw" : "en"]
+  );
+
+  return {
+    threads: res.rows.map((row) => ({
+      thread_id: row.thread_id,
+      lesson_id: row.lesson_id,
+      lesson_title: row.lesson_title,
+      substrand_name: row.substrand_name,
+      strand_name: row.strand_name,
+      subject_name: row.subject_name,
+      grade_name: row.grade_name,
+      message_count: row.message_count,
+      visual_count: row.visual_count,
+      last_active_at: row.last_active_at || row.created_at,
+      last_question: row.last_question || "",
+      last_answer: row.last_answer || "",
+      saved_visuals: Array.isArray(row.saved_visuals) ? row.saved_visuals : [],
+    })),
+  };
+}
+
+/**
  * Helper to build script excerpt from variant script object
  */
 function extractScriptExcerpt(scriptObj) {

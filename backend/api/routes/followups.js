@@ -14,6 +14,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import {
   getOrCreateThread,
   getThreadHistory,
+  getStudentSavedThreads,
   streamFollowUpResponse,
   getFollowUpVisualJob,
   updateFollowUpVisualJob,
@@ -48,6 +49,16 @@ router.post(
 );
 
 router.use(authMiddleware);
+
+router.get(
+  "/threads",
+  asyncHandler(async (req, res) => {
+    const studentId = req.auth?.student_id;
+    const lang = req.query?.lang === "sw" || req.query?.lang === "en" ? req.query.lang : req.lang;
+    const result = await getStudentSavedThreads({ studentId, lang });
+    res.json(result);
+  })
+);
 
 router.get(
   "/jobs/:job_id",
