@@ -41,3 +41,32 @@ Op spec:
 { "op": "highlight", "target": "2x" }
 { "op": "arrow",     "from": "both sides", "to": "2x + 3 = 7" }
 { "op": "equation",  "latex": "x = 2" }
+```
+
+---
+
+## P4.3 — SMS / USSD Follow-Up Stub (Africa's Talking)
+
+*(Skipped per user request)*
+
+---
+
+## P4.4 — Adaptive Recommendations & Ask Tutor Page (/ask)
+
+**Context:** Complete the Phase 4 exit criterion by providing adaptive mastery-map-driven
+recommendations and a standalone Free-Form Ask Tutor page (`AskPage.jsx`) as specified
+in `docs/08-FRONTEND.md` and `docs/01-ARCHITECTURE.md`.
+
+**Files:**
+- `backend/api/services/progress_service.js` (adaptive recommendation using mastery map weak-spots)
+- `frontend/src/pages/AskPage.jsx` (free-form CBC AI Tutor with subject selector, voice push-to-talk, streaming whiteboard & visuals)
+- `frontend/src/App.jsx` (mount `/ask` route)
+- `frontend/src/components/layout/Layout.jsx` (add "Ask Tutor" / "Uliza Mwalimu" nav item)
+- `backend/api/__tests__/p4_4_adaptive_and_ask.test.js`
+
+**Acceptance criteria:**
+- [ ] Adaptive next-lesson recommendation prioritizes sub-strands flagged `review_recommended` (< 60% mastery) in the student's mastery map before advancing to unstarted topics.
+- [ ] Kiswahili toggle persists across browser sessions in `localStorage` and drives UI translations + API requests.
+- [ ] `/ask` route mounts `AskPage.jsx`, allowing students to query any CBC subject/topic directly with streaming text, whiteboard op rendering, and push-to-talk voice input.
+- [ ] All tests passing cleanly without blocking the student experience.
+

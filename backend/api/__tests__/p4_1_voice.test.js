@@ -76,18 +76,23 @@ describe("P4.1 — Voice Assistant Embedded in Lesson (/api/voice/* & Follow-up 
       { expiresIn: "1h" }
     );
 
-    // Pick a mathematics substrand and publish a lesson
+    // Create an isolated substrand for this test to avoid parallel runner collision
     const ssRes = await pool.query(
-      `SELECT ss.id
-       FROM substrands ss
-       JOIN strands st ON st.id = ss.strand_id
+      `SELECT st.id
+       FROM strands st
        JOIN grade_subjects gs ON gs.id = st.grade_subject_id
        JOIN subjects s ON s.id = gs.subject_id
        WHERE s.code = 'mathematics'
        LIMIT 1`
     );
-    const substrandId = ssRes.rows[0].id;
-    await pool.query(`DELETE FROM lessons WHERE substrand_id = $1`, [substrandId]);
+    const strandId = ssRes.rows[0].id;
+    const subRes = await pool.query(
+      `INSERT INTO substrands (strand_id, name, sort_order)
+       VALUES ($1, 'P4.1 Voice Isolated Substrand', 991)
+       RETURNING id`,
+      [strandId]
+    );
+    const substrandId = subRes.rows[0].id;
 
     const pub = await enqueueAuthoringJobs({
       scope: { substrand_id: substrandId },

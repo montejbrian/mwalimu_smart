@@ -554,52 +554,94 @@ export async function getRecentActivity({ studentId, limit = 10, lang = "en" }) 
             : "Review this lesson and try the questions again whenever you're ready.",
         };
       } else {
-        const fakeLesson = {
-          id: top.lesson_id,
-          substrand_id: top.substrand_id,
-          grade_subject_id: top.grade_subject_id,
-          strand_sort: top.strand_sort,
-          substrand_sort: top.substrand_sort,
-        };
-        const rec = await computeRecommendation(client, fakeLesson, topMastery ?? 1.0);
-        if (rec.type === "next" && rec.substrand_id) {
-          const nextSubstrandInfo = (
-            await client.query(
-              `SELECT ss.name AS substrand_name, st.name AS strand_name, s.name_en, s.name_sw,
-                      (SELECT l.title FROM lessons l WHERE l.id = $2) AS lesson_title
-               FROM substrands ss
-               JOIN strands st ON st.id = ss.strand_id
-               JOIN grade_subjects gs ON gs.id = st.grade_subject_id
-               JOIN subjects s ON s.id = gs.subject_id
-               WHERE ss.id = $1`,
-              [rec.substrand_id, rec.lesson_id]
-            )
-          ).rows[0];
+        // Adaptive check: If student has earlier weak sub-strands in this subject (< MASTERED_THRESHOLD),
+        // recommend reviewing the weakest sub-strand to close learning gaps.
+        const weakSubstrand = (
+          await client.query(
+            `SELECT ss.id, ss.name AS substrand_name, st.name AS strand_name, s.name_en, s.name_sw,
+                    sm.mastery_score,
+                    (
+                      SELECT l.id FROM lessons l
+                      WHERE l.substrand_id = ss.id AND l.status = 'published'
+                      ORDER BY l.sort_order ASC, l.version DESC
+                      LIMIT 1
+                    ) AS lesson_id
+             FROM student_mastery sm
+             JOIN substrands ss ON ss.id = sm.substrand_id
+             JOIN strands st ON st.id = ss.strand_id
+             JOIN grade_subjects gs ON gs.id = st.grade_subject_id
+             JOIN subjects s ON s.id = gs.subject_id
+             WHERE sm.student_id = $1
+               AND sm.mastery_score < $2
+               AND gs.id = $3
+               AND ss.id != $4
+             ORDER BY sm.mastery_score ASC, sm.updated_at ASC
+             LIMIT 1`,
+            [sid, MASTERED_THRESHOLD, top.grade_subject_id, top.substrand_id]
+          )
+        ).rows[0];
 
+        if (weakSubstrand && weakSubstrand.lesson_id) {
           recommendation = {
-            type: "next",
-            lesson_id: rec.lesson_id,
-            substrand_id: rec.substrand_id,
-            title:
-              nextSubstrandInfo?.lesson_title || nextSubstrandInfo?.substrand_name || "Next Lesson",
-            strand_name: nextSubstrandInfo?.strand_name || null,
-            subject_name: useSw ? nextSubstrandInfo?.name_sw : nextSubstrandInfo?.name_en,
+            type: "review",
+            reason: "gap",
+            lesson_id: weakSubstrand.lesson_id,
+            substrand_id: weakSubstrand.id,
+            title: weakSubstrand.substrand_name,
+            strand_name: weakSubstrand.strand_name,
+            subject_name: useSw ? weakSubstrand.name_sw : weakSubstrand.name_en,
             message: useSw
-              ? "Kazi nzuri! Endelea na mada inayofuata katika mtaala wako."
-              : "Great progress! Continue to the next topic in your curriculum.",
+              ? `Ushauri wa Mwalimu: Mada ya "${weakSubstrand.substrand_name}" inahitaji marudio kidogo ili kuimarisha msingi wako.`
+              : `Teacher's Tip: "${weakSubstrand.substrand_name}" needs a quick review to strengthen your foundation.`,
           };
         } else {
-          recommendation = {
-            type: "done",
-            lesson_id: null,
-            substrand_id: null,
-            title: null,
-            strand_name: null,
-            subject_name: useSw ? top.subject_name_sw : top.subject_name_en,
-            message: useSw
-              ? "Umefika mwisho wa mada za somo hili. Chunguza masomo mengine!"
-              : "You have completed all available topics in this subject. Explore other subjects!",
+          const fakeLesson = {
+            id: top.lesson_id,
+            substrand_id: top.substrand_id,
+            grade_subject_id: top.grade_subject_id,
+            strand_sort: top.strand_sort,
+            substrand_sort: top.substrand_sort,
           };
+          const rec = await computeRecommendation(client, fakeLesson, topMastery ?? 1.0);
+          if (rec.type === "next" && rec.substrand_id) {
+            const nextSubstrandInfo = (
+              await client.query(
+                `SELECT ss.name AS substrand_name, st.name AS strand_name, s.name_en, s.name_sw,
+                        (SELECT l.title FROM lessons l WHERE l.id = $2) AS lesson_title
+                 FROM substrands ss
+                 JOIN strands st ON st.id = ss.strand_id
+                 JOIN grade_subjects gs ON gs.id = st.grade_subject_id
+                 JOIN subjects s ON s.id = gs.subject_id
+                 WHERE ss.id = $1`,
+                [rec.substrand_id, rec.lesson_id]
+              )
+            ).rows[0];
+
+            recommendation = {
+              type: "next",
+              lesson_id: rec.lesson_id,
+              substrand_id: rec.substrand_id,
+              title:
+                nextSubstrandInfo?.lesson_title || nextSubstrandInfo?.substrand_name || "Next Lesson",
+              strand_name: nextSubstrandInfo?.strand_name || null,
+              subject_name: useSw ? nextSubstrandInfo?.name_sw : nextSubstrandInfo?.name_en,
+              message: useSw
+                ? "Kazi nzuri! Endelea na mada inayofuata katika mtaala wako."
+                : "Great progress! Continue to the next topic in your curriculum.",
+            };
+          } else {
+            recommendation = {
+              type: "done",
+              lesson_id: null,
+              substrand_id: null,
+              title: null,
+              strand_name: null,
+              subject_name: useSw ? top.subject_name_sw : top.subject_name_en,
+              message: useSw
+                ? "Umefika mwisho wa mada za somo hili. Chunguza masomo mengine!"
+                : "You have completed all available topics in this subject. Explore other subjects!",
+            };
+          }
         }
       }
     } else {

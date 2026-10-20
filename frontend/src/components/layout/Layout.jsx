@@ -21,6 +21,7 @@ import clsx from "clsx";
 const STUDENT_NAV = [
   { to: "/", icon: Home, label: { en: "Home", sw: "Nyumbani" }, end: true },
   { to: "/browse", icon: Compass, label: { en: "Curriculum", sw: "Mtaala" } },
+  { to: "/ask", icon: Sparkles, label: { en: "Ask Tutor", sw: "Uliza Mwalimu" } },
   { to: "/me", icon: GraduationCap, label: { en: "My Learning", sw: "Mafunzo Yangu" } },
   { to: "/voice", icon: Mic, label: { en: "Voice Tutor", sw: "Mwalimu wa Sauti" } },
 ];

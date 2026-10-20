@@ -11,6 +11,7 @@ import AuthoringDashboard from "./pages/authoring/AuthoringDashboard.jsx";
 import ReviewQueue from "./pages/authoring/ReviewQueue.jsx";
 import VoicePage from "./pages/VoicePage.jsx";
 import MyLearningPage from "./pages/MyLearningPage.jsx";
+import AskPage from "./pages/AskPage.jsx";
 
 function Protected({ children }) {
   const token = useStore((s) => s.token);
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="lesson/:lesson_id/assess" element={<AssessmentPage />} />
         <Route path="lesson/:lesson_id/diagnostic" element={<AssessmentPage />} />
         <Route path="me" element={<MyLearningPage />} />
+        <Route path="ask" element={<AskPage />} />
         <Route path="history" element={<Navigate to="/me" replace />} />
         <Route path="voice" element={<VoicePage />} />
         <Route
