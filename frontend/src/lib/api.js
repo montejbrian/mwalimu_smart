@@ -116,8 +116,9 @@ export const lessonApi = {
   history:  (sid,p)=> api.get(`/schools/${sid}/lessons`, { params: p }),
 };
 export const voiceApi = {
-  message:    b  => api.post("/voice/message", b),
-  stt:        b  => api.post("/voice/stt", b),
+  message:     b => api.post("/voice/message", b),
+  sendMessage: b => api.post("/voice/message", b),
+  stt:         b => api.post("/voice/stt", b),
   endSession: id => api.delete(`/voice/session/${id}`),
 };
 export const healthApi = { check: () => api.get("/health") };

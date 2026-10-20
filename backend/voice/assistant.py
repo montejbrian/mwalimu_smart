@@ -45,6 +45,8 @@ import google.generativeai as genai
 from google.cloud import texttospeech
 
 from config.settings import settings
+from followups.prompt import build_followup_prompt
+from followups.stream import generate_mock_stream
 
 log = logging.getLogger(__name__)
 
@@ -133,6 +135,7 @@ class VoiceSession:
     current_topic:   Optional[str]          = None
     current_grade:   Optional[str]          = None
     last_response:   Optional[str]          = None
+    lesson_context:  Optional[dict[str, Any]] = None
     diagnostic_answers: dict[str, str]      = field(default_factory=dict)
     history:         list[ConversationTurn] = field(default_factory=list)
 
@@ -150,11 +153,15 @@ class VoiceAssistant:
         lesson_id: str,
         school_id: str,
         language:  Language = "en",
+        lesson_context: Optional[dict[str, Any]] = None,
     ):
         self.session = VoiceSession(
             lesson_id=lesson_id,
             school_id=school_id,
             language=language,
+            lesson_context=lesson_context,
+            current_topic=lesson_context.get("lesson_title") if lesson_context else None,
+            current_grade=lesson_context.get("grade_name") if lesson_context else None,
         )
 
         # Gemini for NLU
@@ -186,18 +193,37 @@ class VoiceAssistant:
         )
 
     def _build_qa_system_prompt(self) -> str:
-        return f"""\
-You are MwalimuSmart, a warm and encouraging CBC-aligned teaching assistant
-for Kenyan schools. You answer questions about lesson topics clearly and simply.
+        ctx = getattr(self.session, "lesson_context", None) or {}
+        lesson_title = ctx.get("lesson_title") or self.session.current_topic or "Current CBC Lesson"
+        objectives = ctx.get("objectives") or []
+        script_excerpt = ctx.get("script_excerpt") or ""
+        key_concepts = ctx.get("key_concepts") or []
+        grade_name = ctx.get("grade_name") or self.session.current_grade or "Grade 7"
+        subject_name = ctx.get("subject_name") or "CBC Curriculum"
+        strand_name = ctx.get("strand_name") or "Science & Technology"
+        lang = self.session.language
 
-Rules:
-- Keep answers under 4 sentences for voice delivery
-- Use Kenyan examples (matatus, maize, Lake Victoria, Nairobi, etc.)
-- CBC strand alignment is mandatory
-- Language: {"English" if self.session.language == "en" else "Kiswahili"}
-- Always end with an encouraging phrase
-- Never say you are an AI
-"""
+        base_prompt = build_followup_prompt(
+            lesson_title=lesson_title,
+            objectives=objectives,
+            script_excerpt=script_excerpt,
+            key_concepts=key_concepts,
+            conversation_history=[],
+            question="[VOICE_QUESTION_PLACEHOLDER]",
+            grade_name=grade_name,
+            subject_name=subject_name,
+            strand_name=strand_name,
+            lang=lang,
+        )
+        system_instructions = base_prompt.split("STUDENT QUESTION:")[0].strip()
+        system_instructions += (
+            "\n\nVOICE RULES:\n"
+            "- Keep spoken answers strictly under 4 sentences for voice clarity\n"
+            "- Use relatable Kenyan classroom, home, or community examples\n"
+            "- Maintain an encouraging, patient CBC teacher tone\n"
+            "- End with a warm follow-up question"
+        )
+        return system_instructions
 
     # ── NLU ───────────────────────────────────────────────────────────────────
 
@@ -217,7 +243,7 @@ Rules:
 
             data = json.loads(raw)
             return Intent(
-                intent=data.get("intent", "UNKNOWN"),
+                intent=data.get("intent", "QUESTION_ANSWER"),
                 topic=data.get("topic"),
                 grade_level=data.get("grade_level"),
                 strand=data.get("strand"),
@@ -230,24 +256,33 @@ Rules:
 
         except Exception as exc:
             log.warning("[VoiceAssistant] NLU failed: %s", exc)
-            return Intent(intent="UNKNOWN", raw_text=text, language=self.session.language)
+            return Intent(intent="QUESTION_ANSWER", raw_text=text, language=self.session.language)
 
     # ── Response generation ───────────────────────────────────────────────────
 
     async def _generate_qa_response(self, question: str) -> str:
-        """Generate a concise voice-ready answer using Gemini."""
-        context = ""
-        if self.session.current_topic:
-            context = f"We are currently studying: {self.session.current_topic}. "
+        """Generate a concise voice-ready answer using Gemini with fallback."""
+        ctx = getattr(self.session, "lesson_context", None) or {}
+        lesson_title = ctx.get("lesson_title") or self.session.current_topic or "Current Lesson"
+        lang = self.session.language
 
+        context = f"Lesson: {lesson_title}. "
         prompt = context + question
 
-        loop     = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None,
-            lambda: self._qa_model.generate_content(prompt),
-        )
-        return response.text.strip()
+        try:
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: self._qa_model.generate_content(prompt),
+            )
+            text = response.text.strip()
+            if text:
+                return text
+        except Exception as exc:
+            log.warning("[VoiceAssistant] Gemini Q&A call failed: %s, falling back to mock stream", exc)
+
+        chunks = list(generate_mock_stream(question=question, lesson_title=lesson_title, lang=lang))
+        return "".join(chunks).strip()
 
     def _build_intent_response(self, intent: Intent) -> str:
         """
@@ -403,6 +438,8 @@ Rules:
             "response_text": response_text,
             "audio_b64":     audio_b64,
             "action":        action,
+            "lesson_id":     self.session.lesson_id,
+            "language":      self.session.language,
             "session": {
                 "current_topic":       self.session.current_topic,
                 "current_grade":       self.session.current_grade,

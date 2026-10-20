@@ -59,6 +59,7 @@ class VoiceSessionManager:
         student_id: str,
         lesson_id:  str,
         language:   Language = "en",
+        lesson_context: Optional[dict[str, Any]] = None,
     ) -> VoiceAssistant:
         """
         Return existing session or create a new one.
@@ -70,6 +71,14 @@ class VoiceSessionManager:
             if key in self._sessions:
                 entry = self._sessions[key]
                 entry.last_active = time.time()
+                if lesson_context:
+                    entry.assistant.session.lesson_context = lesson_context
+                    if lesson_context.get("lesson_title"):
+                        entry.assistant.session.current_topic = lesson_context["lesson_title"]
+                    if lesson_context.get("grade_name"):
+                        entry.assistant.session.current_grade = lesson_context["grade_name"]
+                if language:
+                    entry.assistant.session.language = language
                 log.debug("[SessionManager] Reusing session %s", key)
                 return entry.assistant
 
@@ -86,6 +95,7 @@ class VoiceSessionManager:
                 lesson_id=lesson_id,
                 school_id=school_id,
                 language=language,
+                lesson_context=lesson_context,
             )
             self._sessions[key] = SessionEntry(assistant=assistant)
             log.info("[SessionManager] Created session %s (total=%d)", key, len(self._sessions))

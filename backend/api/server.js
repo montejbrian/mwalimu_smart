@@ -22,6 +22,8 @@ import rateLimit         from "express-rate-limit";
 import path              from "path";
 import { fileURLToPath } from "url";
 
+import jwt from "jsonwebtoken";
+import { config } from "./config.js";
 import { pool, getDb, checkHealth } from "./db.js";
 import { PythonBridge }   from "./python_bridge.js";
 import { authMiddleware } from "./middleware/auth.js";
@@ -35,6 +37,8 @@ import lessonRoutes       from "./routes/lessons.js";
 import authoringRoutes    from "./routes/authoring.js";
 import progressRoutes     from "./routes/progress.js";
 import followupRoutes     from "./routes/followups.js";
+import { createVoiceRouter } from "./routes/voice.js";
+import { processVoiceTurn }  from "./services/voice_service.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // public/ = compiled React SPA copied here during CI/CD build step
@@ -115,6 +119,7 @@ app.use("/api/lessons", lessonRoutes);
 app.use("/api/authoring", authoringRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/followups", followupRoutes);
+app.use("/api/voice", createVoiceRouter(bridge));
 
 // Health — used by cloud load balancers and uptime monitors
 app.get("/api/health", async (_req, res) => {
@@ -247,51 +252,6 @@ app.get("/api/schools/:schoolId/lessons", authMiddleware, async (req, res) => {
   } catch { res.status(500).json({ error: "Failed to fetch history" }); }
 });
 
-// ── Voice: text message ───────────────────────────────────────────────────────
-app.post("/api/voice/message", authMiddleware, validateVoice, async (req, res) => {
-  const { school_id, teacher_id, student_id } = req.auth;
-  const creator_id = student_id || teacher_id;
-  const { student_id: req_student_id, lesson_id, text, language = "en" } = req.body;
-  try {
-    const result = await bridge.invokeVoice({
-      school_id, student_id: req_student_id || creator_id, lesson_id, text, language,
-    });
-    // Auto-trigger lesson if voice requested one
-    if (result.action?.type === "TRIGGER_LESSON") {
-      const newId = uuidv4();
-      const { topic, grade_level, strand } = result.action;
-      await pool.query(
-        `INSERT INTO lesson_jobs (lesson_id,school_id,creator_id,topic,strand,grade_level,language,workflow_status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,'initialised')`,
-        [newId, school_id, creator_id, topic, strand || "science_technology", grade_level || "grade_7", language]
-      );
-      bridge.invokeGraph({ lesson_id: newId, topic, strand: strand || "science_technology", grade_level: grade_level || "grade_7", language, school_id, teacher_id: creator_id, remedial_mode: false })
-        .catch(err => logger.error({ err: err.message }, "voice-triggered graph failed"));
-      result.action.lesson_id = newId;
-    }
-    res.json(result);
-  } catch (err) {
-    logger.error({ err: err.message }, "voice failed");
-    res.status(500).json({ error: "Voice processing failed" });
-  }
-});
-
-// ── Voice: STT ────────────────────────────────────────────────────────────────
-app.post("/api/voice/stt", authMiddleware, async (req, res) => {
-  const { audio_b64, language = "en-KE", encoding = "WEBM_OPUS", sample_rate = 48000 } = req.body;
-  if (!audio_b64) return res.status(400).json({ error: "audio_b64 required" });
-  try { res.json(await bridge.transcribeAudio({ audio_b64, language, encoding, sample_rate })); }
-  catch { res.status(500).json({ error: "STT failed" }); }
-});
-
-// ── Voice: end session ────────────────────────────────────────────────────────
-app.delete("/api/voice/session/:id", authMiddleware, async (req, res) => {
-  try {
-    await bridge.endVoiceSession({ school_id: req.auth.school_id, student_id: req.auth.teacher_id });
-    res.json({ status: "ended" });
-  } catch { res.status(500).json({ error: "Failed to end session" }); }
-});
-
 // ── WebSocket — real-time voice & follow-up visual broadcast ──────────────────
 wss.on("connection", (ws, req) => {
   const sid = uuidv4();
@@ -304,6 +264,14 @@ wss.on("connection", (ws, req) => {
 
     const token = url.searchParams.get("token");
     if (!token) {
+      ws.close(4001, "Unauthorized");
+      return;
+    }
+
+    let authUser = null;
+    try {
+      authUser = jwt.verify(token, config.authSecret);
+    } catch {
       ws.close(4001, "Unauthorized");
       return;
     }
@@ -325,25 +293,32 @@ wss.on("connection", (ws, req) => {
             });
             ws.send(JSON.stringify({ type: "transcript", payload: stt }));
             buf = Buffer.alloc(0);
-            const voice = await bridge.invokeVoice({
-              school_id: msg.school_id,
-              student_id: msg.student_id || sid,
-              lesson_id: msg.lesson_id || sid,
-              text: stt.transcript,
-              language: (msg.language || "en-KE").slice(0, 2),
-            });
-            ws.send(JSON.stringify({ type: "response", payload: voice }));
+
+            if (msg.lesson_id && stt.transcript) {
+              const voiceTurn = await processVoiceTurn({
+                schoolId: msg.school_id || authUser.school_id,
+                studentId: msg.student_id || authUser.student_id || authUser.teacher_id || sid,
+                lessonId: msg.lesson_id,
+                text: stt.transcript,
+                language: (msg.language || "en-KE").slice(0, 2),
+                bridge,
+              });
+              ws.send(JSON.stringify({ type: "response", payload: voiceTurn }));
+            }
             break;
           }
           case "text": {
-            const voice = await bridge.invokeVoice({
-              school_id: msg.school_id,
-              student_id: msg.student_id || sid,
-              lesson_id: msg.lesson_id || sid,
-              text: msg.payload,
-              language: msg.language || "en",
-            });
-            ws.send(JSON.stringify({ type: "response", payload: voice }));
+            if (msg.lesson_id && msg.payload) {
+              const voiceTurn = await processVoiceTurn({
+                schoolId: msg.school_id || authUser.school_id,
+                studentId: msg.student_id || authUser.student_id || authUser.teacher_id || sid,
+                lessonId: msg.lesson_id,
+                text: msg.payload,
+                language: msg.language || "en",
+                bridge,
+              });
+              ws.send(JSON.stringify({ type: "response", payload: voiceTurn }));
+            }
             break;
           }
           case "end_session":

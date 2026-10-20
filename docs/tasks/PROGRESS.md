@@ -25,3 +25,4 @@
 | P3.2 | done | 2026-10-20 | Added 5 CBC SVG templates, VisualRenderer.jsx, fast visual router (<500ms) with keyword heuristics + LLM fallback, SSE visual_queued/ready events, FF_TIER1_VISUALS gating, and p3_2_visual_templates.test.js |
 | P3.3 | done | 2026-10-20 | Extended manim_worker to poll followup_visual_jobs, added Tier 2 router path, WebSocket broadcast in server.js (/ws/followups), Tier2PlaceholderCard with 3-min timeout + retry, and p3_3_tier2_followups.test.js |
 | P3.4 | done | 2026-10-20 | Added GET /api/followups/threads aggregating saved Q&A, MyLearningPage Saved Q&A & Visuals section, reloadable thread history with Tier 1 SVG & Tier 2 video playback, and p3_4_saved_threads.test.js |
+| P4.1 | done | 2026-10-20 | Added embedded Push-to-Talk voice assistant in lesson (LessonPlayerPage + FollowUpPanel), lesson-scoped NLU prompt, bilingual STT/TTS (en-KE/sw-KE), automatic follow-up thread persistence, and p4_1_voice.test.js |

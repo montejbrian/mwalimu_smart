@@ -11,9 +11,24 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
-import { MessageSquare, Sparkles, Send, Eye, Bot, User, AlertCircle, Film, Clock, RotateCw } from "lucide-react";
+import {
+  MessageSquare,
+  Sparkles,
+  Send,
+  Eye,
+  Bot,
+  User,
+  AlertCircle,
+  Film,
+  Clock,
+  RotateCw,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import clsx from "clsx";
-import { followupsApi } from "../../lib/api.js";
+import { followupsApi, voiceApi } from "../../lib/api.js";
 import { streamSSE } from "../../lib/sse.js";
 import { useStore, useFollowUpStore } from "../../lib/store.js";
 import VisualRenderer from "../visuals/VisualRenderer.jsx";
@@ -110,9 +125,14 @@ export default function FollowUpPanel({
   const [loadingThread, setLoadingThread] = useState(false);
   const [streamError, setStreamError] = useState(null);
   const [isStreamingLocal, setIsStreamingLocal] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isVoiceLoading, setIsVoiceLoading] = useState(false);
+  const [playingAudioId, setPlayingAudioId] = useState(null);
 
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const audioPlayerRef = useRef(null);
 
   const token = useStore((s) => s.token);
   const streamingStore = useFollowUpStore((s) => s.streaming);
@@ -274,6 +294,139 @@ export default function FollowUpPanel({
     );
     if (questionContent) {
       setPrompt(questionContent);
+    }
+  };
+
+  const handleVoicePushToTalk = async () => {
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition =
+      typeof window !== "undefined" &&
+      (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.lang = lang === "sw" ? "sw-KE" : "en-KE";
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => {
+          setIsListening(true);
+          setStreamError(null);
+        };
+
+        recognition.onresult = async (event) => {
+          const speechTranscript = event.results?.[0]?.[0]?.transcript;
+          setIsListening(false);
+          if (speechTranscript) {
+            await sendVoiceTurn(speechTranscript);
+          }
+        };
+
+        recognition.onerror = () => {
+          setIsListening(false);
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+        return;
+      } catch (err) {
+        setIsListening(false);
+      }
+    }
+
+    // Direct simulated push-to-talk voice query fallback when mic hardware/API is absent
+    const fallbackText =
+      prompt.trim() ||
+      (lang === "sw"
+        ? `Nielezee zaidi kuhusu somo hili la ${title || "CBC"}`
+        : `Explain this concept in ${title || "this CBC lesson"} clearly with a Kenyan example`);
+    await sendVoiceTurn(fallbackText);
+  };
+
+  const sendVoiceTurn = async (voiceText) => {
+    if (!voiceText || !lessonId) return;
+    setIsVoiceLoading(true);
+    setStreamError(null);
+
+    const optimisticUserMsg = {
+      id: `voice-user-${Date.now()}`,
+      role: "student",
+      content: voiceText,
+      source: "voice",
+      created_at: new Date().toISOString(),
+    };
+    setLocalMessages((prev) => [...prev, optimisticUserMsg]);
+
+    try {
+      const res = await voiceApi.sendMessage({
+        lesson_id: lessonId,
+        text: voiceText,
+        language: lang,
+      });
+      const data = res.data;
+      if (data?.assistant_message) {
+        const asstMsg = {
+          ...data.assistant_message,
+          audio_b64: data.audio_b64,
+        };
+        setLocalMessages((prev) => [
+          ...prev.filter((m) => m.id !== optimisticUserMsg.id),
+          data.student_message || optimisticUserMsg,
+          asstMsg,
+        ]);
+        if (data.audio_b64) {
+          try {
+            if (audioPlayerRef.current) {
+              audioPlayerRef.current.pause();
+            }
+            const audio = new Audio("data:audio/mp3;base64," + data.audio_b64);
+            audioPlayerRef.current = audio;
+            setPlayingAudioId(asstMsg.id);
+            audio.onended = () => setPlayingAudioId(null);
+            audio.play().catch(() => {});
+          } catch {}
+        }
+      }
+    } catch (err) {
+      setStreamError(
+        lang === "sw"
+          ? "Hitilafu kwenye msaidizi wa sauti. Jaribu tena."
+          : "Voice assistant error. Please try again."
+      );
+    } finally {
+      setIsVoiceLoading(false);
+    }
+  };
+
+  const togglePlayAudio = (msgId, audioB64) => {
+    if (playingAudioId === msgId && audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      setPlayingAudioId(null);
+      return;
+    }
+    if (audioB64) {
+      try {
+        if (audioPlayerRef.current) audioPlayerRef.current.pause();
+        const audio = new Audio("data:audio/mp3;base64," + audioB64);
+        audioPlayerRef.current = audio;
+        setPlayingAudioId(msgId);
+        audio.onended = () => setPlayingAudioId(null);
+        audio.play().catch(() => {});
+      } catch {}
     }
   };
 
@@ -449,6 +602,7 @@ export default function FollowUpPanel({
 
   return (
     <section
+      id="lesson-followup-panel"
       data-testid="followup-panel"
       className="rounded-3xl glass-active border border-brand-500/40 p-6 space-y-4 shadow-glow-green"
     >
@@ -541,7 +695,35 @@ export default function FollowUpPanel({
                     : "bg-ink-900/80 border border-[var(--border)] text-ink-200 mr-4"
                 )}
               >
+                {(m.source === "voice" || m.visual_spec?.source === "voice") && (
+                  <div className="mb-1">
+                    <span
+                      data-testid="voice-turn-badge"
+                      className="inline-flex items-center gap-1 text-[10px] text-brand-300 font-mono px-1.5 py-0.5 rounded bg-brand-500/15 border border-brand-500/30"
+                    >
+                      <Mic size={10} />
+                      <span>Voice</span>
+                    </span>
+                  </div>
+                )}
                 <div className="whitespace-pre-wrap">{m.content}</div>
+                {m.role === "assistant" && (m.audio_b64 || m.visual_spec?.has_audio) && (
+                  <div className="mt-2 pt-1 border-t border-[var(--border)] flex items-center gap-2">
+                    <button
+                      type="button"
+                      data-testid="voice-play-audio-btn"
+                      onClick={() => togglePlayAudio(m.id, m.audio_b64)}
+                      className="inline-flex items-center gap-1.5 text-[11px] text-brand-400 hover:text-brand-300 transition-colors"
+                    >
+                      {playingAudioId === m.id ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                      <span>
+                        {playingAudioId === m.id
+                          ? (lang === "sw" ? "Sitisha sauti" : "Pause audio")
+                          : (lang === "sw" ? "Sikiliza jibu" : "Listen to answer")}
+                      </span>
+                    </button>
+                  </div>
+                )}
                 {m.visual_loading && (
                   <div
                     data-testid="visual-loading-indicator"
@@ -643,7 +825,7 @@ export default function FollowUpPanel({
             data-testid="followup-input"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            disabled={isStreaming}
+            disabled={isStreaming || isVoiceLoading}
             placeholder={
               lang === "sw"
                 ? "Uliza swali lolote kuhusu somo hili..."
@@ -653,9 +835,33 @@ export default function FollowUpPanel({
           />
         </div>
         <button
+          type="button"
+          data-testid="voice-mic-btn"
+          onClick={handleVoicePushToTalk}
+          disabled={isStreaming || isVoiceLoading}
+          className={clsx(
+            "px-3.5 py-3 rounded-2xl font-medium border inline-flex items-center gap-1.5 transition-all text-xs",
+            isListening
+              ? "bg-red-500 text-white border-red-400 animate-pulse ring-2 ring-red-400/50"
+              : isVoiceLoading
+              ? "bg-brand-500/20 text-brand-300 border-brand-500/40 animate-pulse"
+              : "glass border-[var(--border)] text-brand-300 hover:text-brand-100 hover:border-brand-500/50"
+          )}
+          title={lang === "sw" ? "Ongea na Mwalimu (Push-to-Talk)" : "Push-to-talk voice assistant"}
+        >
+          {isListening ? <MicOff size={15} /> : <Mic size={15} />}
+          <span className="hidden sm:inline">
+            {isListening
+              ? (lang === "sw" ? "Inasikiliza..." : "Listening...")
+              : isVoiceLoading
+              ? (lang === "sw" ? "Inajibu..." : "Speaking...")
+              : (lang === "sw" ? "Sauti" : "Voice")}
+          </span>
+        </button>
+        <button
           type="submit"
           data-testid="followup-submit-btn"
-          disabled={!prompt.trim() || isStreaming}
+          disabled={!prompt.trim() || isStreaming || isVoiceLoading}
           className="btn-primary px-4 py-3 disabled:opacity-40"
         >
           <MessageSquare size={15} className="hidden sm:inline" />

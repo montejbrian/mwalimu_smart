@@ -37,7 +37,9 @@ export function validateLesson(req, res, next) {
 
 
 export function validateVoice(req, res, next) {
-  const { school_id, student_id, lesson_id, text } = req.body;
+  const school_id = req.body?.school_id || req.auth?.school_id;
+  const student_id = req.body?.student_id || req.auth?.student_id || req.auth?.teacher_id;
+  const { lesson_id, text } = req.body || {};
   const errors = [];
 
   if (!school_id?.trim())   errors.push("school_id is required");

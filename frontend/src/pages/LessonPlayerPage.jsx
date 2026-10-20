@@ -10,6 +10,7 @@ import {
   Film,
   HelpCircle,
   AlertCircle,
+  Mic,
 } from "lucide-react";
 import clsx from "clsx";
 import toast from "react-hot-toast";
@@ -217,6 +218,21 @@ export default function LessonPlayerPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              data-testid="lesson-mic-btn"
+              onClick={() => {
+                const el = document.getElementById("lesson-followup-panel");
+                if (el) el.scrollIntoView({ behavior: "smooth" });
+                const mic = document.querySelector('[data-testid="voice-mic-btn"]');
+                if (mic) mic.click();
+              }}
+              className="btn-ghost text-xs px-3.5 py-2 inline-flex items-center gap-1.5 text-brand-300 hover:text-brand-200 border border-brand-500/30"
+            >
+              <Mic size={14} className="text-brand-400" />
+              <span>{lang === "sw" ? "Ongea na Mwalimu" : "Voice Assistant"}</span>
+            </button>
+
             <button
               type="button"
               data-testid="download-transcript-btn"
