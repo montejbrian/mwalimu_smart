@@ -42,8 +42,18 @@ const PUBLIC_DIR = path.join(__dirname, "..", "public");
 
 const app    = express();
 const server = createServer(app);
-const wss    = new WebSocketServer({ server, path: "/ws/voice" });
+const wss    = new WebSocketServer({ server });
 const bridge = new PythonBridge();
+
+export function broadcastFollowupVisual(eventPayload) {
+  const data = typeof eventPayload === "string" ? eventPayload : JSON.stringify(eventPayload);
+  wss.clients.forEach((client) => {
+    if (client.readyState === 1) {
+      client.send(data);
+    }
+  });
+}
+app.set("broadcastFollowupVisual", broadcastFollowupVisual);
 
 // ── Security & CORS ───────────────────────────────────────────────────────────
 const WEB_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:5173")
@@ -282,64 +292,87 @@ app.delete("/api/voice/session/:id", authMiddleware, async (req, res) => {
   } catch { res.status(500).json({ error: "Failed to end session" }); }
 });
 
-// ── WebSocket — real-time voice ───────────────────────────────────────────────
+// ── WebSocket — real-time voice & follow-up visual broadcast ──────────────────
 wss.on("connection", (ws, req) => {
   const sid = uuidv4();
-  let buf = Buffer.alloc(0);
-  logger.info({ sid }, "WS opened");
+  const url = new URL(req.url, "http://localhost");
+  const pathname = url.pathname;
 
-  // Optional: validate token from ?token= query param
-  const url    = new URL(req.url, "http://localhost");
-  const token  = url.searchParams.get("token");
-  if (!token) { ws.close(4001, "Unauthorized"); return; }
+  if (pathname.startsWith("/ws/voice")) {
+    let buf = Buffer.alloc(0);
+    logger.info({ sid }, "Voice WS opened");
 
-  ws.on("message", async raw => {
-    try {
-      const msg = JSON.parse(raw.toString());
-      switch (msg.type) {
-        case "audio_chunk":
-          buf = Buffer.concat([buf, Buffer.from(msg.payload, "base64")]);
-          break;
-        case "audio_end": {
-          if (!buf.length) break;
-          const stt = await bridge.transcribeAudio({
-            audio_b64: buf.toString("base64"),
-            language: msg.language || "en-KE",
-            encoding: msg.encoding || "WEBM_OPUS",
-            sample_rate: msg.sample_rate || 48000,
-          });
-          ws.send(JSON.stringify({ type: "transcript", payload: stt }));
-          buf = Buffer.alloc(0);
-          const voice = await bridge.invokeVoice({
-            school_id:  msg.school_id,
-            student_id: msg.student_id || sid,
-            lesson_id:  msg.lesson_id  || sid,
-            text:       stt.transcript,
-            language:   (msg.language || "en-KE").slice(0, 2),
-          });
-          ws.send(JSON.stringify({ type: "response", payload: voice }));
-          break;
-        }
-        case "text": {
-          const voice = await bridge.invokeVoice({
-            school_id:  msg.school_id,
-            student_id: msg.student_id || sid,
-            lesson_id:  msg.lesson_id  || sid,
-            text:       msg.payload,
-            language:   msg.language || "en",
-          });
-          ws.send(JSON.stringify({ type: "response", payload: voice }));
-          break;
-        }
-        case "end_session":
-          ws.close(1000);
-          break;
-      }
-    } catch (err) {
-      ws.send(JSON.stringify({ type: "error", payload: err.message }));
+    const token = url.searchParams.get("token");
+    if (!token) {
+      ws.close(4001, "Unauthorized");
+      return;
     }
-  });
-  ws.on("close", () => logger.info({ sid }, "WS closed"));
+
+    ws.on("message", async (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
+        switch (msg.type) {
+          case "audio_chunk":
+            buf = Buffer.concat([buf, Buffer.from(msg.payload, "base64")]);
+            break;
+          case "audio_end": {
+            if (!buf.length) break;
+            const stt = await bridge.transcribeAudio({
+              audio_b64: buf.toString("base64"),
+              language: msg.language || "en-KE",
+              encoding: msg.encoding || "WEBM_OPUS",
+              sample_rate: msg.sample_rate || 48000,
+            });
+            ws.send(JSON.stringify({ type: "transcript", payload: stt }));
+            buf = Buffer.alloc(0);
+            const voice = await bridge.invokeVoice({
+              school_id: msg.school_id,
+              student_id: msg.student_id || sid,
+              lesson_id: msg.lesson_id || sid,
+              text: stt.transcript,
+              language: (msg.language || "en-KE").slice(0, 2),
+            });
+            ws.send(JSON.stringify({ type: "response", payload: voice }));
+            break;
+          }
+          case "text": {
+            const voice = await bridge.invokeVoice({
+              school_id: msg.school_id,
+              student_id: msg.student_id || sid,
+              lesson_id: msg.lesson_id || sid,
+              text: msg.payload,
+              language: msg.language || "en",
+            });
+            ws.send(JSON.stringify({ type: "response", payload: voice }));
+            break;
+          }
+          case "end_session":
+            ws.close(1000);
+            break;
+        }
+      } catch (err) {
+        ws.send(JSON.stringify({ type: "error", payload: err.message }));
+      }
+    });
+    ws.on("close", () => logger.info({ sid }, "Voice WS closed"));
+  } else {
+    // Follow-up visual broadcast & real-time notification socket
+    logger.info({ sid, pathname }, "Follow-up WS opened");
+    ws.send(JSON.stringify({ type: "connected", sid }));
+
+    ws.on("message", (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
+        if (msg.type === "ping") {
+          ws.send(JSON.stringify({ type: "pong", timestamp: Date.now() }));
+        }
+      } catch {
+        // ignore
+      }
+    });
+
+    ws.on("close", () => logger.info({ sid }, "Follow-up WS closed"));
+  }
 });
 
 // ── SPA fallback ──────────────────────────────────────────────────────────────

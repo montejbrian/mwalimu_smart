@@ -11,7 +11,8 @@
 import { spawn } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
-import { pool } from "../db.js";
+import { v4 as uuidv4 } from "uuid";
+import { pool, getDb } from "../db.js";
 import { AppError } from "../utils/errors.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -256,17 +257,21 @@ export async function streamFollowUpResponse({
     clearInterval(heartbeat);
   };
 
-  // Tier 1 Visual router (Feature Flag gated via FF_TIER1_VISUALS)
-  const enableTier1 = process.env.FF_TIER1_VISUALS !== "false";
-  const shouldRouteVisuals = with_visuals !== false && enableTier1;
+  // Visual router (Feature Flag gated via FF_TIER1_VISUALS)
+  const enableVisuals = process.env.FF_TIER1_VISUALS !== "false";
+  const shouldRouteVisuals = with_visuals !== false && enableVisuals;
 
   let matchedVisualSpec = null;
   let visualPromise = null;
 
   if (shouldRouteVisuals) {
     visualPromise = runVisualRouter(cleanContent, ctx.title)
-      .then((visualResult) => {
-        if (visualResult && visualResult.match && visualResult.tier === 1) {
+      .then(async (visualResult) => {
+        if (!visualResult || !visualResult.match) {
+          return null;
+        }
+
+        if (visualResult.tier === 1) {
           matchedVisualSpec = {
             tier: 1,
             template_id: visualResult.template_id,
@@ -285,6 +290,44 @@ export async function streamFollowUpResponse({
               params: visualResult.params,
             })}\n\n`
           );
+        } else if (visualResult.tier === 2) {
+          // Tier 2: Enqueue Manim follow-up job and notify client immediately (<200ms)
+          const jobId = uuidv4();
+          matchedVisualSpec = {
+            tier: 2,
+            job_id: jobId,
+            status: "queued",
+            prompt: cleanContent,
+            concept: visualResult.concept || cleanContent,
+            created_at: new Date().toISOString(),
+          };
+
+          res.write(
+            `event: visual_queued\ndata: ${JSON.stringify({
+              tier: 2,
+              job_id: jobId,
+              status: "queued",
+              placeholder: "Preparing custom animation...",
+            })}\n\n`
+          );
+
+          try {
+            const db = await getDb();
+            await db.collection("followup_visual_jobs").insertOne({
+              job_id: jobId,
+              student_id: sid,
+              lesson_id: ctx.lesson_id,
+              thread_id: threadId,
+              question: cleanContent,
+              concept: visualResult.concept || cleanContent,
+              scene_prompt: visualResult.scene_prompt || `Visualizing ${cleanContent}`,
+              status: "queued",
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+          } catch {
+            // Mongo queue insertion is non-blocking to stream
+          }
         }
         return matchedVisualSpec;
       })
@@ -388,4 +431,89 @@ export async function streamFollowUpResponse({
     cleanUp();
     child.kill();
   });
+}
+
+/**
+ * Retrieves the status and result of a Tier 2 visual job.
+ */
+export async function getFollowUpVisualJob(jobId) {
+  // 1. Check MongoDB
+  try {
+    const db = await getDb();
+    const job = await db.collection("followup_visual_jobs").findOne({ job_id: jobId });
+    if (job) {
+      return {
+        job_id: job.job_id,
+        status: job.status,
+        asset_url: job.asset_url || null,
+        error: job.error || null,
+        created_at: job.created_at,
+      };
+    }
+  } catch {
+    // Fall back to Postgres if MongoDB is unreachable
+  }
+
+  // 2. Check PostgreSQL followup_messages
+  const msgRes = await pool.query(
+    `SELECT visual_spec FROM followup_messages WHERE visual_spec->>'job_id' = $1 LIMIT 1`,
+    [jobId]
+  );
+  if (msgRes.rows.length > 0 && msgRes.rows[0].visual_spec) {
+    const spec = msgRes.rows[0].visual_spec;
+    return {
+      job_id: spec.job_id,
+      status: spec.status || "queued",
+      asset_url: spec.asset_url || null,
+      error: spec.error || null,
+    };
+  }
+
+  throw new AppError("not_found", "Visual job not found");
+}
+
+/**
+ * Updates a Tier 2 visual job in MongoDB and PostgreSQL.
+ */
+export async function updateFollowUpVisualJob({ jobId, status, asset_url = null, error = null }) {
+  // 1. Update MongoDB
+  try {
+    const db = await getDb();
+    await db.collection("followup_visual_jobs").updateOne(
+      { job_id: jobId },
+      {
+        $set: {
+          status,
+          asset_url: asset_url || null,
+          error: error || null,
+          updated_at: new Date(),
+        },
+      }
+    );
+  } catch {
+    // Ignore
+  }
+
+  // 2. Update PostgreSQL followup_messages
+  const updateRes = await pool.query(
+    `UPDATE followup_messages
+     SET visual_spec = jsonb_set(
+       jsonb_set(
+         jsonb_set(coalesce(visual_spec, '{}'::jsonb), '{status}', to_jsonb($2::text)),
+         '{asset_url}', to_jsonb($3::text)
+       ),
+       '{error}', to_jsonb($4::text)
+     )
+     WHERE visual_spec->>'job_id' = $1
+     RETURNING id, thread_id`,
+    [jobId, status, asset_url || "", error || ""]
+  );
+
+  return {
+    job_id: jobId,
+    status,
+    asset_url,
+    error,
+    thread_id: updateRes.rows[0]?.thread_id,
+  };
 }

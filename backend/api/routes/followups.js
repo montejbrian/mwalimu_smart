@@ -15,11 +15,47 @@ import {
   getOrCreateThread,
   getThreadHistory,
   streamFollowUpResponse,
+  getFollowUpVisualJob,
+  updateFollowUpVisualJob,
 } from "../services/followup_service.js";
 
 const router = Router();
 
+// Internal worker endpoint (no student auth required)
+router.post(
+  "/internal/visual-ready",
+  asyncHandler(async (req, res) => {
+    const { job_id, status, asset_url, error } = req.body || {};
+    const updated = await updateFollowUpVisualJob({
+      jobId: job_id,
+      status: status || "ready",
+      asset_url,
+      error,
+    });
+    // Broadcast via WebSocket if registered
+    if (typeof req.app?.get === "function" && req.app.get("broadcastFollowupVisual")) {
+      req.app.get("broadcastFollowupVisual")({
+        type: status === "failed" ? "followup_visual_failed" : "followup_visual_ready",
+        job_id,
+        thread_id: updated.thread_id,
+        status: status || "ready",
+        asset_url,
+        error,
+      });
+    }
+    res.json(updated);
+  })
+);
+
 router.use(authMiddleware);
+
+router.get(
+  "/jobs/:job_id",
+  asyncHandler(async (req, res) => {
+    const job = await getFollowUpVisualJob(req.params.job_id);
+    res.json(job);
+  })
+);
 
 router.post(
   "/lessons/:lesson_id/threads",

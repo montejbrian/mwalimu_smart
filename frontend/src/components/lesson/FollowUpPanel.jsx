@@ -11,12 +11,91 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
-import { MessageSquare, Sparkles, Send, Eye, Bot, User, AlertCircle } from "lucide-react";
+import { MessageSquare, Sparkles, Send, Eye, Bot, User, AlertCircle, Film, Clock, RotateCw } from "lucide-react";
 import clsx from "clsx";
 import { followupsApi } from "../../lib/api.js";
 import { streamSSE } from "../../lib/sse.js";
 import { useStore, useFollowUpStore } from "../../lib/store.js";
 import VisualRenderer from "../visuals/VisualRenderer.jsx";
+
+function Tier2PlaceholderCard({ jobId, lang, queuedAt, onRetry }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const startTime = queuedAt ? new Date(queuedAt).getTime() : Date.now();
+    const interval = setInterval(() => {
+      const seconds = Math.floor((Date.now() - startTime) / 1000);
+      setElapsed(seconds);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [queuedAt]);
+
+  const isTimedOut = elapsed >= 180; // 3 minutes timeout
+
+  if (isTimedOut) {
+    return (
+      <div
+        data-testid="tier2-timeout-card"
+        className="mt-3 p-3.5 bg-amber-950/40 border border-amber-500/30 rounded-xl text-xs text-amber-200 space-y-2"
+      >
+        <div className="flex items-center gap-2">
+          <Clock size={15} className="text-amber-400 shrink-0" />
+          <span>
+            {lang === "sw"
+              ? "Kielelezo hakipatikani kwa sasa."
+              : "Visual not available at this moment."}
+          </span>
+        </div>
+        <button
+          type="button"
+          data-testid="tier2-timeout-retry-btn"
+          onClick={onRetry}
+          className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-800 hover:bg-amber-700 text-white rounded-lg text-xs font-medium transition-colors"
+        >
+          <RotateCw size={12} />
+          <span>{lang === "sw" ? "Jaribu tena" : "Retry visual"}</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-testid="tier2-placeholder-card"
+      className="mt-3 p-3.5 bg-slate-900 border border-brand-500/40 rounded-xl space-y-2.5 shadow-md"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs font-semibold text-brand-300">
+          <Film size={15} className="text-brand-400 animate-pulse" />
+          <span>
+            {lang === "sw"
+              ? "Inaandaa kielelezo cha video cha Manim..."
+              : "Generating custom Manim visual animation..."}
+          </span>
+        </div>
+        <span className="text-[11px] font-mono text-slate-400">
+          {Math.floor(elapsed / 60)}:{(elapsed % 60).toString().padStart(2, "0")} / 3:00
+        </span>
+      </div>
+
+      <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+        <div
+          className="bg-brand-500 h-full rounded-full transition-all duration-1000 animate-pulse"
+          style={{ width: `${Math.min(95, Math.max(10, (elapsed / 90) * 100))}%` }}
+        />
+      </div>
+
+      <div className="text-[11px] text-slate-400 flex items-center justify-between">
+        <span>
+          {lang === "sw"
+            ? "Mwalimu anatengeneza picha na michoro kwa wakati halisi..."
+            : "Rendering mathematical geometry & concept frames..."}
+        </span>
+        <span className="text-brand-400 font-mono text-[10px]">Tier 2 Manim</span>
+      </div>
+    </div>
+  );
+}
 
 export default function FollowUpPanel({
   lessonId,
@@ -83,6 +162,120 @@ export default function FollowUpPanel({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [localMessages]);
+
+  // WebSocket & Polling listener for active Tier 2 Manim visual jobs
+  useEffect(() => {
+    const pendingJobs = localMessages.filter(
+      (m) =>
+        m.visual_spec?.tier === 2 &&
+        (m.visual_spec?.status === "queued" || m.visual_spec?.status === "rendering") &&
+        m.visual_spec?.job_id
+    );
+
+    if (pendingJobs.length === 0) return;
+
+    let ws = null;
+    try {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const host = window.location.host || "localhost:4000";
+      ws = new WebSocket(`${protocol}//${host}/ws/followups`);
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "followup_visual_ready" && data.job_id) {
+            setLocalMessages((prev) =>
+              prev.map((msg) =>
+                msg.visual_spec?.job_id === data.job_id
+                  ? {
+                      ...msg,
+                      visual_spec: {
+                        ...msg.visual_spec,
+                        status: "ready",
+                        asset_url: data.asset_url,
+                      },
+                    }
+                  : msg
+              )
+            );
+          } else if (data.type === "followup_visual_failed" && data.job_id) {
+            setLocalMessages((prev) =>
+              prev.map((msg) =>
+                msg.visual_spec?.job_id === data.job_id
+                  ? {
+                      ...msg,
+                      visual_spec: {
+                        ...msg.visual_spec,
+                        status: "failed",
+                        error: data.error || "Rendering failed",
+                      },
+                    }
+                  : msg
+              )
+            );
+          }
+        } catch {
+          // ignore malformed ws messages
+        }
+      };
+    } catch {
+      // WS error, fall back to interval polling below
+    }
+
+    const interval = setInterval(() => {
+      pendingJobs.forEach((m) => {
+        const jobId = m.visual_spec.job_id;
+        followupsApi
+          .getVisualJob(jobId)
+          .then((res) => {
+            const job = res.data;
+            if (job && (job.status === "ready" || job.status === "failed")) {
+              setLocalMessages((prev) =>
+                prev.map((msg) =>
+                  msg.visual_spec?.job_id === jobId
+                    ? {
+                        ...msg,
+                        visual_spec: {
+                          ...msg.visual_spec,
+                          status: job.status,
+                          asset_url: job.asset_url,
+                          error: job.error,
+                        },
+                      }
+                    : msg
+                )
+              );
+            }
+          })
+          .catch(() => {});
+      });
+    }, 3000);
+
+    return () => {
+      clearInterval(interval);
+      if (ws) ws.close();
+    };
+  }, [localMessages]);
+
+  const handleRetryVisual = (jobId, questionContent) => {
+    setLocalMessages((prev) =>
+      prev.map((msg) =>
+        msg.visual_spec?.job_id === jobId
+          ? {
+              ...msg,
+              visual_spec: {
+                ...msg.visual_spec,
+                status: "queued",
+                queuedAt: Date.now(),
+              },
+            }
+          : msg
+      )
+    );
+    if (questionContent) {
+      setPrompt(questionContent);
+    }
+  };
 
   const starterChips = (keyConcepts.length > 0
     ? keyConcepts.slice(0, 3)
@@ -177,8 +370,16 @@ export default function FollowUpPanel({
                 msg.id === assistantMsgId
                   ? {
                       ...msg,
-                      visual_loading: true,
-                      visual_spec: { tier: vData.tier || 1, template_id: vData.template_id },
+                      visual_loading: vData.tier === 1,
+                      visual_spec:
+                        vData.tier === 2
+                          ? {
+                              tier: 2,
+                              job_id: vData.job_id,
+                              status: "queued",
+                              queuedAt: Date.now(),
+                            }
+                          : { tier: 1, template_id: vData.template_id },
                     }
                   : msg
               )
@@ -354,9 +555,66 @@ export default function FollowUpPanel({
                     </span>
                   </div>
                 )}
-                {(m.has_visual || m.visual_spec) && m.visual_spec?.template_id && (
+                {/* Tier 1 Interactive SVG Visual */}
+                {(m.has_visual || m.visual_spec) && m.visual_spec?.tier === 1 && m.visual_spec?.template_id && (
                   <div className="mt-2 pt-1">
                     <VisualRenderer visualSpec={m.visual_spec} />
+                  </div>
+                )}
+
+                {/* Tier 2 Manim Video Animation */}
+                {(m.has_visual || m.visual_spec) && m.visual_spec?.tier === 2 && (
+                  <div className="mt-2.5">
+                    {m.visual_spec.status === "ready" && m.visual_spec.asset_url ? (
+                      <div data-testid="tier2-video-container" className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs text-brand-400 font-semibold">
+                          <Film size={14} />
+                          <span>
+                            {lang === "sw"
+                              ? "Ufafanuzi wa Video (Manim)"
+                              : "Custom Video Animation (Manim)"}
+                          </span>
+                        </div>
+                        <video
+                          data-testid="tier2-video-player"
+                          src={m.visual_spec.asset_url}
+                          controls
+                          autoPlay
+                          playsInline
+                          className="w-full rounded-2xl border border-brand-500/40 shadow-lg bg-black"
+                        />
+                      </div>
+                    ) : m.visual_spec.status === "failed" ? (
+                      <div
+                        data-testid="tier2-failed-card"
+                        className="p-3 bg-red-950/40 border border-red-500/30 rounded-xl text-xs text-red-300 space-y-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <AlertCircle size={15} className="text-red-400 shrink-0" />
+                          <span>
+                            {lang === "sw"
+                              ? "Mchoro wa video haukufanikiwa kuundwa kwa swali hili."
+                              : "Could not generate animation for this question."}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          data-testid="tier2-retry-btn"
+                          onClick={() => handleRetryVisual(m.visual_spec.job_id, m.content)}
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-red-800 hover:bg-red-700 text-white rounded-lg text-xs font-medium"
+                        >
+                          <RotateCw size={12} />
+                          <span>{lang === "sw" ? "Jaribu tena" : "Retry visual"}</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <Tier2PlaceholderCard
+                        jobId={m.visual_spec.job_id}
+                        lang={lang}
+                        queuedAt={m.visual_spec.created_at || m.visual_spec.queuedAt}
+                        onRetry={() => handleRetryVisual(m.visual_spec.job_id, m.content)}
+                      />
+                    )}
                   </div>
                 )}
                 {m.isStreaming && !m.content && !m.visual_loading && (

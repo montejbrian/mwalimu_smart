@@ -103,6 +103,8 @@ export const followupsApi = {
     api.get(`/followups/threads/${threadId}`),
   streamUrl: (threadId) =>
     `/api/followups/threads/${threadId}/messages`,
+  getVisualJob: (jobId) =>
+    api.get(`/followups/jobs/${jobId}`),
 };
 
 export const lessonApi = {

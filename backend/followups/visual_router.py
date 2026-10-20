@@ -126,20 +126,58 @@ def route_by_heuristics(question: str, lesson_title: str) -> dict[str, Any] | No
     return None
 
 
+def check_tier2_heuristic(question: str, lesson_title: str) -> dict[str, Any] | None:
+    """
+    Checks if a follow-up question requests a dynamic Manim animation (Tier 2).
+    """
+    q = question.lower()
+    tier2_keywords = [
+        "animation", "animate", "animated", "video", "manim",
+        "simulation", "simulate", "movement", "motion",
+        "show me visually", "visualize", "draw", "diagram",
+        "illustrate", "how does it look", "visual explanation",
+        "show animation", "make a video", "visual demonstration",
+    ]
+    if any(kw in q for kw in tier2_keywords):
+        return {
+            "match": True,
+            "tier": 2,
+            "concept": question.strip(),
+            "scene_prompt": f"Manim visualization illustrating: {question.strip()} for lesson: {lesson_title}",
+        }
+    return None
+
+
 def route_visual(question: str, lesson_title: str) -> dict[str, Any]:
     """
-    Decides whether a follow-up question routes to a Tier 1 visual template.
+    Decides whether a follow-up question routes to Tier 1 SVG template or Tier 2 Manim visual.
     Returns:
       { "match": True, "tier": 1, "template_id": "...", "params": { ... } }
+      { "match": True, "tier": 2, "concept": "...", "scene_prompt": "..." }
     or:
       { "match": False, "no_match": True }
     """
-    # 1. Fast heuristics (<5ms)
+    q = question.lower()
+    explicit_tier2 = ["animation", "animate", "animated", "video", "manim", "simulation", "simulate"]
+    if any(kw in q for kw in explicit_tier2):
+        return {
+            "match": True,
+            "tier": 2,
+            "concept": question.strip(),
+            "scene_prompt": f"Manim visualization illustrating: {question.strip()} for lesson: {lesson_title}",
+        }
+
+    # 1. Fast Tier 1 heuristics (<5ms)
     fast_match = route_by_heuristics(question, lesson_title)
     if fast_match:
         return fast_match
 
-    # 2. LLM classifier fallback if key available and not in test
+    # 2. General Tier 2 heuristics (<5ms)
+    tier2_match = check_tier2_heuristic(question, lesson_title)
+    if tier2_match:
+        return tier2_match
+
+    # 3. LLM classifier fallback if key available and not in test
     is_test = os.environ.get("NODE_ENV") == "test" or os.environ.get("PYTEST_CURRENT_TEST")
 
     if not is_test:
@@ -171,6 +209,13 @@ def route_visual(question: str, lesson_title: str) -> dict[str, Any]:
                         "tier": 1,
                         "template_id": template_id,
                         "params": params,
+                    }
+                elif data.get("tier") == 2 or data.get("wants_animation"):
+                    return {
+                        "match": True,
+                        "tier": 2,
+                        "concept": question.strip(),
+                        "scene_prompt": f"Manim visualization illustrating: {question.strip()} for lesson: {lesson_title}",
                     }
         except Exception as exc:
             log.debug("LLM visual router exception: %s", exc)
